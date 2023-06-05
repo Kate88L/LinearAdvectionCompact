@@ -1,8 +1,9 @@
 # main code
 
 using LinearAlgebra
-# using Plots
 using Plotly
+
+include("InitialFunctions.jl")
 
 ## Definition of basic parameters
 
@@ -24,7 +25,7 @@ tau = c * h / u
 Ntau = 16
 
 # Initial condition
-phi_0(x) = cos(x);
+phi_0(x) = piecewiseConstant(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);

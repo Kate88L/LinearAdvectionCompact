@@ -7,13 +7,16 @@ include("InitialFunctions.jl")
 
 ## Definition of basic parameters
 
+# Level of refinement
+level = 3;
+
 # Courant number
-c = 1
+c = 2
 
 # Grid settings
 xL = - pi / 2
 xR = pi
-Nx = 160 * 100
+Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
@@ -22,7 +25,7 @@ u = 2.0
 # Time
 tau = c * h / u
 # Ntau = Int(Nx / 10)
-Ntau = 16 * 10
+Ntau = 10
 
 # Initial condition
 phi_0(x) = piecewiseConstant(x);
@@ -80,8 +83,8 @@ for i = 3:Nx
 end
 
 # Print the error
-println("Error L2: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), 2))
-println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf))
+println("Error L2: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau))* h^2)
+println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf)* h^2)
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact scheme solution")

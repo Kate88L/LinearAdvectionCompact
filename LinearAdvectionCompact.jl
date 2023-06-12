@@ -11,7 +11,7 @@ include("InitialFunctions.jl")
 level = 0
 
 # Courant number
-c = 0.5
+c = 0.1
 
 # Grid settings
 xL = - pi / 2
@@ -24,11 +24,10 @@ u = 2.0
 
 # Time
 tau = c * h / u
-# Ntau = Int(Nx / 10)
-Ntau = 10;
+Ntau = Int(Nx / 10)
 
 # Initial condition
-phi_0(x) = piecewiseConstant(x);
+phi_0(x) = cos(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -52,13 +51,8 @@ phi_first_order[:, 2] = phi_exact.(x, tau);
 
 # Boundary conditions
 phi[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
-phi[Nx + 1, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-
 phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
-phi_first_order[Nx + 1, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-
 phi_predictor[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor[Nx + 1, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
 
 # ENO parameters
 w = 1 / 2;
@@ -88,8 +82,10 @@ for n = 2:Ntau
 end
 
 # Print the error
-println("Error L2: ", sum(abs.(phi[:, end] - phi_exact.(x, Ntau * tau)))*h^2)
-# println("Error L_inf: ", maximum(abs.(phi[:, end] - phi_exact.(x, Ntau * tau)))*h^2)
+println("Error L2: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau))* h^2)
+# println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf)* h^2)
+
+println("Error L2 first order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau))* h^2)
 
 
 # Plot of the result at the final time together with the exact solution

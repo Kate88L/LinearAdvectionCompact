@@ -11,7 +11,7 @@ include("InitialFunctions.jl")
 level = 0
 
 # Courant number
-c = 0.1
+c = 0.5
 
 # Grid settings
 xL = - pi / 2
@@ -51,14 +51,24 @@ phi_first_order[:, 2] = phi_exact.(x, tau);
 
 # Boundary conditions
 phi[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
-phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_predictor[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
+phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
+
+# Ghost point on the time -1
+ghost_point_time = phi_exact.(x, -tau);
 
 # ENO parameters
 w = 1 / 2;
 
 # Time loop
-for n = 2:Ntau
+for n = 1:Ntau
+
+    if n > 1
+        phi_old = phi[:, n - 1];
+    else
+        phi_old = ghost_point_time;
+    end
+
     # Space loop
     for i = 2:Nx+1
 
@@ -70,10 +80,10 @@ for n = 2:Ntau
 
         # Corrector
         r_downwind = - phi_predictor[i, n + 1] + phi_predictor[i - 1, n + 1] + phi[i, n] - phi[i - 1, n + 1];
-        r_upwind = phi[i - 1, n + 1] - phi[i - 1, n] - phi[i, n] + phi[i, n - 1];
+        r_upwind = phi[i - 1, n + 1] - phi[i - 1, n] - phi[i, n] + phi_old[i];
 
         # Second order solution
-        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - 0.5 * ( 1 - w ) * r_downwind - 0.5 * w * r_upwind ) / ( 1 + c );
+        phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * ( 1 - w ) * r_downwind - 0.5 * w * r_upwind ) ) / ( 1 + c );
 
         # Predictor for next time step
         phi_predictor[i, n + 1] = ( phi_predictor[i - 1, n + 1] + c^(-1) * (phi[i, n] ) ) / ( 1 + c^(-1) );
@@ -82,11 +92,12 @@ for n = 2:Ntau
 end
 
 # Print the error
-println("Error L2: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau))* h^2)
-# println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf)* h^2)
+println("Error L2: ", sum(abs.(phi[:,end] - phi_exact.(x, Ntau * tau))) * h)
+println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
 
-println("Error L2 first order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau))* h^2)
-
+# Print first order error
+println("Error L2 first order: ", sum(abs.(phi_first_order[:,end] - phi_exact.(x, Ntau * tau))) * h)
+println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf)* h)
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact scheme solution")
@@ -98,7 +109,7 @@ layout = Layout(title = "Linear advection equation", xaxis_title = "x", yaxis_ti
 plot_phi = plot([trace1, trace2, trace3], layout)
 
 # Plot of the numerical derivative of the solution and the exact solution at the final time
-trace1_d = scatter(x = x, y = diff(phi[:,end]) / h, mode = "lines", name = "Compact sol. gradient")
+trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
 trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
 trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
 
@@ -109,6 +120,3 @@ plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
 p = [plot_phi; plod_d_phi]
 relayout!(p, width = 1000, height = 500)
 p
-
-
-

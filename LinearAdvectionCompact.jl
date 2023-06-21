@@ -8,10 +8,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 5;
 
 # Courant number
-c = 1.5
+c = 5
 
 # Grid settings
 xL = - pi / 2
@@ -27,7 +27,7 @@ tau = c * h / u
 Ntau = Int(Nx / 10)
 
 # Initial condition
-phi_0(x) = cos(x);
+phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -57,7 +57,7 @@ phi_predictor_n2[1, :] = phi_exact.(x[1], range(tau, (Ntau + 1) * tau, length = 
 ghost_point_time = phi_exact.(x, -tau);
 
 # ENO parameters
-w = 1 / 2;
+s = 1 / 2;
 
 # Time loop
 for n = 1:Ntau
@@ -81,8 +81,15 @@ for n = 1:Ntau
         r_downwind = - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1] + phi[i, n] - phi[i - 1, n + 1];
         r_upwind = phi[i - 1, n + 1] - phi[i - 1, n] - phi[i, n] + phi_old[i];
 
+        # ENO parameter 
+        if abs(r_downwind) >= abs(r_upwind)
+            s = 1;
+        else
+            s = 0;
+        end
+
         # Second order solution
-        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - 0.5 * (1 - w) * r_downwind - 0.5 * w * r_upwind ) / ( 1 + c );
+        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - 0.5 * (1 - s) * r_downwind - 0.5 * s * r_upwind ) / ( 1 + c );
 
         # Predictor for next time step
         phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + c * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + c );

@@ -81,6 +81,13 @@ for i = 3:Nx+1
         r_downwind = - phi_predictor[i, n + 1] + phi_right - phi[i, n] + phi[i - 1, n + 1];
         r_upwind = phi[i, n] - phi[i - 1, n] - phi[i - 1, n + 1] + phi[i - 2, n + 1];
 
+        # ENO parameter
+        if abs(r_downwind) >= abs(r_upwind)
+            w = 1;
+        else
+            w = 0;
+        end
+
         # Second order solution
         phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * ( 1 - w ) * r_downwind - 0.5 * w * r_upwind ) ) / ( 1 + c );
 

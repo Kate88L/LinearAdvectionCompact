@@ -37,26 +37,24 @@ phi_exact(x, t) = phi_0(x - u * t);
 # Grid initialization
 x = range(xL, xR, length = Nx + 1)
 phi = zeros(Nx + 1, Ntau + 1);
-phi_predictor = zeros(Nx + 1, Ntau + 1); # predictor in time n+1
+phi_predictor_i = zeros(Nx + 1, Ntau + 1); # predictor in time n+1
+phi_predictor_n = zeros(Nx + 1, Ntau + 1); # predictor in time n
 phi_predictor_n2 = zeros(Nx + 1, Ntau + 1); # predictor in time n+2
 phi_first_order = zeros(Nx + 1, Ntau + 1);
 
 # Initial condition
 phi[:, 1] = phi_0.(x);
-phi_predictor[:, 1] = phi_0.(x);
+phi_predictor_i[:, 1] = phi_0.(x);
+phi_predictor_n[:, 1] = phi_0.(x);
 phi_predictor_n2[:, 1] = phi_0.(x);
 phi_first_order[:, 1] = phi_0.(x);
 
 # Boundary conditions
 phi[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
+phi_predictor_i[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
+phi_predictor_n[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_predictor_n2[1, :] = phi_exact.(x[1], range(tau, (Ntau + 1) * tau, length = Ntau + 1));
-
-phi[2, :] = phi_exact.(x[2], range(0, Ntau * tau, length = Ntau + 1));
-phi[Nx + 1, :] = phi_exact.(x[Nx + 1], range(0, Ntau * tau, length = Ntau + 1));
-phi_first_order[2, :] = phi_exact.(x[2], range(0, Ntau * tau, length = Ntau + 1));
-phi_first_order[Nx + 1, :] = phi_exact.(x[Nx + 1], range(0, Ntau * tau, length = Ntau + 1));
 
 # Ghost point on the right side 
 ghost_point_right = phi_exact.(xR + h, range(0, Ntau * tau, length = Ntau + 1));
@@ -89,21 +87,24 @@ for n = 1:Ntau
 
         if i > 2
             phi_left_n_plus = phi[i - 2, n + 1];
+            phi_left_n_plus_predictor = phi_predictor_i[i - 2, n + 1];
         else
             phi_left_n_plus = ghost_point_left[n];
+            phi_left_n_plus_predictor = ghost_point_left[n]; 
         end
 
         # First order solution
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c * phi_first_order[i - 1, n + 1] ) / ( 1 + c );
         
         # Predictor
-        phi_predictor[i, n + 1] = ( phi[i, n] + c * phi_predictor[i - 1, n + 1] ) / ( 1 + c );
+        phi_predictor_i[i, n + 1] = ( phi_predictor_i[i, n] + c * (  phi[i - 1, n + 1] ) ) / ( 1 + c );
+        phi_predictor_n[i, n + 1] = ( phi[i, n] + c * phi_predictor_n[i - 1, n + 1] ) / ( 1 + c );
 
         # Corrector
-        r_downwind_i = - phi_predictor[i, n + 1] + phi_right_n - phi[i, n] + phi[i - 1, n + 1];
+        r_downwind_i = - phi_predictor_i[i, n + 1] + phi_right_n - phi[i, n] + phi[i - 1, n + 1];
         r_upwind_i = phi[i, n] - phi[i - 1, n] - phi[i - 1, n + 1] + phi_left_n_plus;
 
-        r_downwind_n = - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1] + phi[i, n] - phi[i - 1, n + 1];
+        r_downwind_n = - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1] + phi[i, n] - phi[i - 1, n + 1];
         r_upwind_n = phi[i - 1, n + 1] - phi[i - 1, n] - phi[i, n] + phi_old[i];
 
         # Second order solution

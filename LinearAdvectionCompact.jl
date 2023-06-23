@@ -86,18 +86,16 @@ for n = 1:Ntau
         end
 
         if i > 2
-            phi_left_n_plus = phi[i - 2, n + 1];
-            phi_left_n_plus_predictor = phi_predictor_i[i - 2, n + 1];
+            phi_left_n_plus = phi_predictor_i[i - 2, n + 1];
         else
             phi_left_n_plus = ghost_point_left[n];
-            phi_left_n_plus_predictor = ghost_point_left[n]; 
         end
 
         # First order solution
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c * phi_first_order[i - 1, n + 1] ) / ( 1 + c );
         
         # Predictor
-        phi_predictor_i[i, n + 1] = ( phi_predictor_i[i, n] + c * (  phi[i - 1, n + 1] ) ) / ( 1 + c );
+        phi_predictor_i[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] ) / ( 1 + c );
         phi_predictor_n[i, n + 1] = ( phi[i, n] + c * phi_predictor_n[i - 1, n + 1] ) / ( 1 + c );
 
         # Corrector

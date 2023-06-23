@@ -19,3 +19,20 @@ function piecewiseLinear(x)
         return 0.0
     end
 end
+
+# Non smooth function
+function nonSmooth(x)
+    c = -(sqrt(3)/2 + 9/2 + 2*pi/3) * (x + 1)
+
+    if -1 <= x < -1/3
+        return c + 2 * cos(3 * pi * x^2 / 2) - sqrt(3)
+    elseif -1/3 <= x < 0
+        return c + 3/2 + 3 * cos(2 * pi * x)
+    elseif 0 <= x < 1/3
+        return c + 15/2 - 3 * cos(2 * pi * x)
+    elseif 1/3 <= x < 1
+        return c + 6 * pi * x * (x - 1) + ( 28 + 4 * pi + cos(3 * pi * x ) ) / 3
+    else
+        return 0.0
+    end
+end

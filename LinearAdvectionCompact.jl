@@ -8,26 +8,29 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 0;
 
 # Courant number
-c = 2
+c = 1
 
 # Grid settings
-xL = - pi / 2
-xR = pi
+xL = -1
+xR = 1
 Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u = 2.0
+u = 1.0
 
 # Time
 tau = c * h / u
 Ntau = Int(Nx / 10)
 
 # Initial condition
-phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = piecewiseLinear(x);
+
+# Periodic initial condition
+phi_0(x) = makePeriodic(nonSmooth,xL,xR)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);

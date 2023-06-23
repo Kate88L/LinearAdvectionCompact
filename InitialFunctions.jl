@@ -36,3 +36,8 @@ function nonSmooth(x)
         return 0.0
     end
 end
+
+# Function to convert a function f to a periodic function on interval xL, xR
+function makePeriodic(f, xL, xR)
+    return x -> f(mod(x - xL, xR - xL) + xL)
+end

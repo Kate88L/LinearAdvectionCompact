@@ -8,10 +8,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 5;
 
 # Courant number
-c = 1
+c = 3
 
 # Grid settings
 xL = -1
@@ -27,10 +27,10 @@ tau = c * h / u
 Ntau = Int(Nx / 10)
 
 # Initial condition
-# phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = piecewiseConstant(x);
 
 # Periodic initial condition
-phi_0(x) = makePeriodic(nonSmooth,xL,xR)(x - 0.5);
+phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -68,7 +68,8 @@ ghost_point_time = phi_exact.(x, -tau);
 
 # ENO parameters
 w = 1 / 2; # normal logic
-s = 1 / 2; # inverted logic
+s = zeros(Nx + 1, Ntau + 1); # inverted logic
+eps = 1e-8;
 
 # Time Loop
 for n = 1:Ntau
@@ -105,25 +106,24 @@ for n = 1:Ntau
         r_downwind_i = - phi_predictor_i[i, n + 1] + phi_right_n - phi[i, n] + phi[i - 1, n + 1];
         r_upwind_i = phi[i, n] - phi[i - 1, n] - phi[i - 1, n + 1] + phi_left_n_plus;
 
-        r_downwind_n = - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1] + phi[i, n] - phi[i - 1, n + 1];
-        r_upwind_n = phi[i - 1, n + 1] - phi[i - 1, n] - phi[i, n] + phi_old[i];
+        r_downwind_n_old = phi[i, n] - phi[i - 1, n + 1];
+        r_upwind_n_old = - phi[i - 1, n] + phi_old[i];
+
+        r_downwind_n_new = - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+        r_upwind_n_new = phi[i - 1, n + 1] - phi[i, n];
 
         # ENO parameters
-        if abs(r_downwind_i) >= abs(r_upwind_i)
-            global w = 1;
-        else
-            global w = 0;
+        abs(r_downwind_i) >= abs(r_upwind_i) ? w = 1 : w = 0;
+
+        if n == 1
+            abs(r_downwind_n_old) < eps ? s[i, n] = 0 : s[i, n] = max(0, min(1, r_upwind_n_old / r_downwind_n_old));
         end
 
-        if abs(r_downwind_n) >= abs(r_upwind_n)
-            global s = 1;
-        else
-            global s = 0;
-        end
+        abs(r_downwind_n_new) <  eps ? s[i, n + 1] = 0 : s[i, n + 1] = max(0, min(1, r_upwind_n_new / r_downwind_n_new));
 
         # Second order solution
-        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - 1 * c * min( 1, max( 0, 3/2 - c ) ) * ( 0.5 * ( 1 - w ) * r_downwind_i + 0.5 * w * r_upwind_i ) 
-                                                            - 1 * max( 0, min( 1, c - 1/2 ) ) * ( 0.5 * (1 - s) * r_downwind_n + 0.5 * s * r_upwind_n  ) ) / ( 1 + c );
+        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - c * min( 1, max( 0, 3/2 - c ) ) * ( 0.5 * ( 1 - w ) * r_downwind_i + 0.5 * w * r_upwind_i ) 
+                                                            - max( 0, min( 1, c - 1/2 ) ) * 0.5 * ( s[i,n] * r_downwind_n_old + s[i,n + 1] * r_downwind_n_new ) ) / ( 1 + c );
 
         # Predictor for next time step
         phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + c * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + c );

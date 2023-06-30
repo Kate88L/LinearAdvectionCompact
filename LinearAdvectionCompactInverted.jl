@@ -11,10 +11,10 @@ include("InitialFunctions.jl")
 level = 5;
 
 # Courant number
-c = 2
+c = 5
 
 # Grid settings
-xL = - pi / 2
+xL = - pi/2
 xR = pi
 Nx = 80 * 2^level
 h = (xR - xL) / Nx
@@ -25,9 +25,11 @@ u = 2.0
 # Time
 tau = c * h / u
 Ntau = Int(Nx / 10)
+# Ntau = 1
 
 # Initial condition
-phi_0(x) = piecewiseLinear(x);
+phi_0(x) = piecewiseConstant(x);
+# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -57,7 +59,9 @@ phi_predictor_n2[1, :] = phi_exact.(x[1], range(tau, (Ntau + 1) * tau, length = 
 ghost_point_time = phi_exact.(x, -tau);
 
 # ENO parameters
-s = 1 / 2;
+s = zeros(Nx + 1, Ntau + 1);
+
+eps = 1e-8;
 
 # Time loop
 for n = 1:Ntau
@@ -78,19 +82,22 @@ for n = 1:Ntau
         phi_predictor[i, n + 1] = ( phi[i, n] + c * phi_predictor[i - 1, n + 1] ) / ( 1 + c );
 
         # Corrector
-        r_downwind = - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1] + phi[i, n] - phi[i - 1, n + 1];
-        r_upwind = phi[i - 1, n + 1] - phi[i - 1, n] - phi[i, n] + phi_old[i];
+        r_downwind_n_old = phi[i, n] - phi[i - 1, n + 1];
+        r_upwind_n_old = - phi[i - 1, n] + phi_old[i];
+
+        r_downwind_n_new = - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+        r_upwind_n_new = phi[i - 1, n + 1] - phi[i, n];
 
         # ENO parameter 
-        if abs(r_downwind) >= abs(r_upwind)
-            s = 1;
-        else
-            s = 0;
+        if n == 1
+            abs(r_downwind_n_old) < eps ? s[i, n] = 0 : s[i, n] = max(0, min(1, r_upwind_n_old / r_downwind_n_old));
         end
 
-        # Second order solution
-        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - 0.5 * (1 - s) * r_downwind - 0.5 * s * r_upwind ) / ( 1 + c );
+        abs(r_downwind_n_new) <  eps ? s[i, n + 1] = 0 : s[i, n + 1] = max(0, min(1, r_upwind_n_new / r_downwind_n_new)); 
 
+        # Second order solution
+        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - 0.5 * ( s[i,n] * r_downwind_n_old 
+                                                                    + s[i,n + 1] * r_downwind_n_new ) ) / ( 1 + c );
         # Predictor for next time step
         phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + c * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + c );
 

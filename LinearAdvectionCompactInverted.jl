@@ -11,16 +11,16 @@ include("InitialFunctions.jl")
 level = 5;
 
 # Courant number
-c = 5
+c = 2.5
 
 # Grid settings
-xL = - pi/2
-xR = pi
+xL = - 1
+xR = 1
 Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u = 2.0
+u = 1.0
 
 # Time
 tau = c * h / u
@@ -28,8 +28,8 @@ Ntau = Int(Nx / 10)
 # Ntau = 1
 
 # Initial condition
-phi_0(x) = piecewiseConstant(x);
-# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+# phi_0(x) = piecewiseLinear(x);
+phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);

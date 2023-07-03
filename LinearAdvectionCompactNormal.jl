@@ -14,8 +14,8 @@ level = 0;
 c = 0.5
 
 # Grid settings
-xL = - pi / 2
-xR = pi
+xL = - 1 * pi/2
+xR = 1 * pi
 Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
@@ -25,8 +25,11 @@ u = 2.0
 # Time
 tau = c * h / u
 Ntau = Int(Nx / 10)
+Ntau = 1
 
 # Initial condition
+# phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 phi_0(x) = cos(x);
 
 # Exact solution
@@ -86,11 +89,11 @@ for i = 2:Nx+1
         r_upwind = phi[i, n] - phi[i - 1, n] - phi[i - 1, n + 1] + phi_left_n_plus;
 
         # ENO parameter
-        # if abs(r_downwind) >= abs(r_upwind)
-        #     w = 1;
-        # else
-        #     w = 0;
-        # end
+        if abs(r_downwind) >= abs(r_upwind)
+            w = 1;
+        else
+            w = 0;
+        end
 
         # Second order solution
         phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * ( 1 - w ) * r_downwind - 0.5 * w * r_upwind ) ) / ( 1 + c );

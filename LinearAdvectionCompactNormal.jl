@@ -65,9 +65,11 @@ w = 1 / 2;
 for i = 2:Nx+1
     # Time loop
     for n = 1:Ntau
+    # Space loop
+    for  i = 2:Nx+1
 
         if i < Nx + 1
-            phi_right = phi_predictor[i + 1, n];
+            phi_right = phi[i + 1, n];
         else
             phi_right = ghost_point_right[n];
         end
@@ -85,7 +87,7 @@ for i = 2:Nx+1
         phi_predictor[i, n + 1] = ( phi_predictor[i, n] + c * phi[i - 1, n + 1] ) / ( 1 + c );
 
         # Corrector
-        r_downwind = - phi_predictor[i, n + 1] + phi_right - phi[i, n] + phi[i - 1, n + 1];
+        r_downwind = - phi_predictor[i, n + 1] + phi_right - phi[i, n] + phi_predictor[i - 1, n + 1];
         r_upwind = phi[i, n] - phi[i - 1, n] - phi[i - 1, n + 1] + phi_left_n_plus;
 
         # ENO parameter
@@ -97,11 +99,6 @@ for i = 2:Nx+1
 
         # Second order solution
         phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * ( 1 - w ) * r_downwind - 0.5 * w * r_upwind ) ) / ( 1 + c );
-
-        # Predictor for next time step
-        if i < Nx + 1
-            phi_predictor[i + 1, n + 1] = ( phi_predictor[i + 1, n] + c * phi[i, n + 1] ) / ( 1 + c );
-        end
 
     end
 end

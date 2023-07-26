@@ -59,10 +59,9 @@ ghost_point_right = phi_exact.(xR + h, range(0, Ntau * tau, length = Ntau + 1));
 ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau + 1));
 
 # ENO parameters
-w = 1 / 2;
+s = zeros(Nx + 1, Ntau + 1);
+eps = 1e-8;
 
-# Space loop
-for i = 2:Nx+1
     # Time loop
     for n = 1:Ntau
     # Space loop
@@ -87,18 +86,21 @@ for i = 2:Nx+1
         phi_predictor[i, n + 1] = ( phi_predictor[i, n] + c * phi[i - 1, n + 1] ) / ( 1 + c );
 
         # Corrector
-        r_downwind = - phi_predictor[i, n + 1] + phi_right - phi[i, n] + phi_predictor[i - 1, n + 1];
-        r_upwind = phi[i, n] - phi[i - 1, n] - phi[i - 1, n + 1] + phi_left_n_plus;
+        r_downwind_i_minus = - phi[i, n] + phi_predictor[i - 1, n + 1];
+        r_upwind_i_minus = - phi[i - 1, n] + phi_left_n_plus;
+
+        r_downwind_i = - phi_predictor[i, n + 1] + phi_right;
+        r_upwind_i = phi[i, n] - phi[i - 1, n + 1];
 
         # ENO parameter
-        if abs(r_downwind) >= abs(r_upwind)
-            w = 1;
-        else
-            w = 0;
+        if i == 2
+            abs(r_downwind_i_minus) < eps ? s[i - 1, n + 1] = 0 : s[i - 1, n + 1] = max(0, min(1, r_upwind_i_minus / r_downwind_i_minus));
         end
 
+        abs(r_downwind_i) <  eps ? s[i, n + 1] = 0 : s[i, n + 1] = max(0, min(1, r_upwind_i / r_downwind_i)); 
+
         # Second order solution
-        phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * ( 1 - w ) * r_downwind - 0.5 * w * r_upwind ) ) / ( 1 + c );
+        phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * s[i - 1, n + 1] * r_downwind_i_minus - 0.5 * s[i, n + 1] * r_downwind_i ) ) / ( 1 + c );
 
     end
 end

@@ -65,8 +65,8 @@ ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau +
 ghost_point_time = phi_exact.(x, -tau);
 
 # ENO parameters
-omega = zeros(Nx + 1, Ntau + 1); # normal logic
-psi = zeros(Nx + 1, Ntau + 1); # inverted logic
+s = zeros(Nx + 1, Ntau + 1); # normal logic
+p = zeros(Nx + 1, Ntau + 1); # inverted logic
 eps = 1e-8;
 
 # Time Loop
@@ -88,7 +88,7 @@ for n = 1:Ntau
         end
 
         if i > 2
-            phi_left_n_plus = phi_predictor_i[i - 2, n + 1];
+            phi_left_n_plus = phi[i - 2, n + 1];
         else
             phi_left_n_plus = ghost_point_left[n];
         end
@@ -97,15 +97,15 @@ for n = 1:Ntau
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c * phi_first_order[i - 1, n + 1] ) / ( 1 + c );
         
         # Predictor
-        phi_predictor_i[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] ) / ( 1 + c );
+        phi_predictor_i[i, n + 1] = ( phi_predictor_i[i, n] + c * phi[i - 1, n + 1] ) / ( 1 + c );
         phi_predictor_n[i, n + 1] = ( phi[i, n] + c * phi_predictor_n[i - 1, n + 1] ) / ( 1 + c );
 
         # Corrector
+        r_downwind_i_minus = phi_predictor_i[i - 1, n + 1] - phi[i, n];
+        r_upwind_i_minus = - phi[i - 1, n] + phi_left_n_plus;
+
         r_downwind_i = - phi_predictor_i[i, n + 1] + phi_right_n;
         r_upwind_i = phi[i, n] - phi[i - 1, n + 1];
-
-        r_downwind_i_left = phi[i - 1, n + 1] - phi[i, n];
-        r_upwind_i_left = - phi[i - 1, n] + phi_left_n_plus;
 
         r_downwind_n_old = phi[i, n] - phi[i - 1, n + 1];
         r_upwind_n_old = - phi[i - 1, n] + phi_old[i];
@@ -115,25 +115,21 @@ for n = 1:Ntau
 
         # ENO parameters
         if i == 2
-            # abs(r_downwind_i_left) < eps ? omega[i-1, n] = 0 : omega[i-1, n] = max(0, min(1, r_upwind_i_left / r_downwind_i_left));
-            abs(r_downwind_i_left) >= abs(r_upwind_i_left) ? omega[i-1, n] = 1 : omega[i-1, n] = 0;
+            abs(r_downwind_i_minus) < eps ? s[i - 1, n + 1] = 0 : s[i - 1, n + 1] = max(0, min(1, r_upwind_i_minus / r_downwind_i_minus));
         end
 
-        # abs(r_downwind_i) <  eps ? omega[i, n] = 0 : omega[i, n] = max(0, min(1, r_upwind_i / r_downwind_i));
-        abs(r_downwind_i + r_downwind_i_left) >= abs(r_upwind_i + r_upwind_i_left) ? omega[i, n] = 0 : omega[i, n] = 1;
+        abs(r_downwind_i) < eps ? s[i, n + 1] = 0 : s[i, n + 1] = max(0, min(1, r_upwind_i / r_downwind_i));
 
         if n == 1
-            abs(r_downwind_n_old) < eps ? psi[i, n] = 0 : psi[i, n] = max(0, min(1, r_upwind_n_old / r_downwind_n_old));
+            abs(r_downwind_n_old) < eps ? p[i, n] = 0 : p[i, n] = max(0, min(1, r_upwind_n_old / r_downwind_n_old));
         end
 
-        abs(r_downwind_n_new) <  eps ? psi[i, n + 1] = 0 : psi[i, n + 1] = max(0, min(1, r_upwind_n_new / r_downwind_n_new));
+        abs(r_downwind_n_new) <  eps ? p[i, n + 1] = 0 : p[i, n + 1] = max(0, min(1, r_upwind_n_new / r_downwind_n_new));
 
         # Second order solution
-        # phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - c * min( 1, max( 0, 3/2 - c ) ) * 0.5 * ( omega[i-1, n] * r_downwind_i_left + omega[i, n] * r_downwind_i ) 
-        #                                                     - max( 0, min( 1, c - 1/2 ) )     * 0.5 * ( psi[i, n] * r_downwind_n_old + psi[i, n + 1] * r_downwind_n_new ) ) / ( 1 + c );
+        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - c * min( 1, max( 0, 3/2 - c ) ) * 0.5 * ( s[i - 1, n + 1] * r_downwind_i_minus + s[i, n + 1] * r_downwind_i ) 
+                                                            - max( 0, min( 1, c - 1/2 ) )     * 0.5 * ( p[i, n] * r_downwind_n_old + p[i, n + 1] * r_downwind_n_new ) ) / ( 1 + c );
 
-
-        phi[i, n + 1] = ( phi[i, n] + c * phi[i - 1, n + 1] - c * 0.5 * ( (1-omega[i, n]) * r_downwind_i_left + omega[i, n] *  r_upwind_i_left + (1-omega[i, n]) * r_downwind_i + omega[i, n] *  r_upwind_i ) ) / ( 1 + c )
 
         # Predictor for next time step
         phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + c * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + c );

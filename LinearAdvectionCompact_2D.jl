@@ -8,7 +8,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 1;
 
 # Courant number
 c = 0.5;
@@ -27,6 +27,7 @@ U = [1.0, 1.0]
 # Time
 tau = c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
+Ntau = 2;
 
 # Initial condition
 phi_0(x1, x2) = cos.(x1) .* cos.(x2);
@@ -75,20 +76,20 @@ for n = 1:Ntau
     phi[1, :, n + 1] = phi_exact.(x1[1], x2, n * tau);
     phi[:, 1, n + 1] = phi_exact.(x1, x2[1], n * tau);
 
-    phi_star[1, :] = phi_exact.(x1[1], x2, n * tau);
-    phi_star[:, 1] = phi_exact.(x1, x2[1], n * tau);
+    # phi_star[1, :] = phi_exact.(x1[1], x2, n * tau);
+    # phi_star[:, 1] = phi_exact.(x1, x2[1], n * tau);
 
     phi_predictor[1, :, n + 1] = phi_exact.(x1[1], x2, n * tau);
     phi_predictor[:, 1, n + 1] = phi_exact.(x1, x2[1], n * tau);
 
     ghost_point_left = phi_exact.(x1L-h, x2, n * tau);
     ghost_point_right = phi_exact.(x1R+h, x2, (n-1) * tau);
-    ghost_point_up = phi_exact.(x1, x2R+h, n * tau);
-    ghost_point_down = phi_exact.(x1, x2L-h, (n-1) * tau);
+    ghost_point_up = phi_exact.(x1, x2R+h, (n-1) * tau);
+    ghost_point_down = phi_exact.(x1, x2L-h, n * tau);
 
     # Fractional step A =====================================================================================================
     for i = 2:Nx + 1
-        j = 2:Nx+1;
+        j = 2:Nx + 1;
 
         if i < Nx + 1
             phi_right = phi[i + 1, j, n];
@@ -117,8 +118,8 @@ for n = 1:Ntau
 
     # ENO parameter 
         for jj = j
-            if n == 1
-                abs(r_downwind_i_minus[jj-1]) < eps ? s[i, jj, n] = 0 : s[i, jj, n] = max(0, min(1, r_upwind_i_minus[jj-1] / r_downwind_i_minus[jj-1]));
+            if i == 2
+                abs(r_downwind_i_minus[jj-1]) < eps ? s[i - 1, jj, n + 1] = 0 : s[i - 1, jj, n + 1] = max(0, min(1, r_upwind_i_minus[jj-1] / r_downwind_i_minus[jj-1]));
             end
             abs(r_downwind_i[jj-1]) < eps ? s[i, jj, n + 1] = 0 : s[i, jj, n + 1] = max(0, min(1, r_upwind_i[jj-1] / r_downwind_i[jj-1])); 
         end
@@ -130,7 +131,7 @@ for n = 1:Ntau
 
     # Fractional step B =====================================================================================================
     for j = 2:Nx + 1
-        i = 2:Nx+1;
+        i = 2:Nx + 1;
 
         if j < Nx + 1
             phi_right = phi[i, j + 1, n + 1];
@@ -141,26 +142,26 @@ for n = 1:Ntau
         if j > 2
             phi_left_n_plus = phi[i, j - 2, n + 1];
         else
-            phi_left_n_plus = ghost_point_left[i];
+            phi_left_n_plus = ghost_point_down[i];
         end
 
     # First order solution
         phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n + 1] + c * phi_first_order[i, j - 1, n + 1] ) / ( 1 + c );
         
     # Predictor
-        phi_predictor[i, j, n + 1] = ( phi[i, j, n + 1] + c * phi_predictor[i, j - 1, n + 1] ) / ( 1 + c );
+        phi_predictor[i, j, n + 1] = ( phi_predictor[i, j, n + 1] + c * phi[i, j - 1, n + 1] ) / ( 1 + c );
 
     # Corrector
         r_downwind_i_minus = - phi[i, j, n + 1] + phi_predictor[i, j - 1, n + 1];
-        r_upwind_i_minus = - phi[i, j - 1, n + 1] + phi_left_n_plus;
+        r_upwind_i_minus = - phi[i, j - 1, n] + phi_left_n_plus;
 
         r_downwind_i = - phi_predictor[i, j, n + 1] + phi_right;
         r_upwind_i = phi[i, j, n + 1] - phi[i, j - 1, n + 1];
 
     # ENO parameter 
         for ii = i
-            if n == 1
-                abs(r_downwind_i_minus[ii-1]) < eps ? s[ii, j, n] = 0 : s[ii, j, n] = max(0, min(1, r_upwind_i_minus[ii-1] / r_downwind_i_minus[ii-1]));
+            if j == 2
+                abs(r_downwind_i_minus[ii-1]) < eps ? s[ii, j - 1, n + 1] = 0 : s[ii, j - 1, n + 1] = max(0, min(1, r_upwind_i_minus[ii-1] / r_downwind_i_minus[ii-1]));
             end
             abs(r_downwind_i[ii-1]) < eps ? s[ii, j, n + 1] = 0 : s[ii, j, n + 1] = max(0, min(1, r_upwind_i[ii-1] / r_downwind_i[ii-1])); 
         end
@@ -172,12 +173,12 @@ for n = 1:Ntau
 end
 
 # Print the error
-println("Error L2: ", sum(abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))) * h^2)
-println("Error L_inf: ", norm(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau), Inf)* h^2)
+println("Error L2: ", sum(abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))) * h^1)
+println("Error L_inf: ", norm(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau), Inf)* h^1)
 
 # Print first order error
-println("Error L2 first order: ", sum(abs.(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau))) * h^2)
-println("Error L_inf firts order: ", norm(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau), Inf)* h^2)
+println("Error L2 first order: ", sum(abs.(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau))) * h)
+println("Error L_inf firts order: ", norm(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau), Inf)* h^1)
 
 # Plot of the result at the final time together with the exact solution
 
@@ -191,4 +192,4 @@ layout = Layout(title = "Linear advection equation", xaxis_title = "x1", yaxis_t
 
 plot_phi = plot([trace1, trace2, trace3], layout)
 
-# plot_error = plot(surface(x = x1, y = x2, z = abs.(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau))* h^2))
+# plot_error = plot(surface(x = x1, y = x2, z = abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))* h^2))

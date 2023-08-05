@@ -8,14 +8,14 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 5;
 
 # Courant number
-c = 0.5
+c = 0.5;
 
 # Grid settings
-xL = -1 * pi/2
-xR = 1 * pi
+xL = -1 #* pi/2
+xR = 1 #* pi
 Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
@@ -27,8 +27,8 @@ tau = c * h / u
 Ntau = Int(Nx / 10)
 
 # Initial condition
-# phi_0(x) = makePeriodic(allInOne,-1,1)(x);
-phi_0(x) = cos(x);
+phi_0(x) = makePeriodic(allInOne,-1,1)(x);
+# phi_0(x) = cos(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);

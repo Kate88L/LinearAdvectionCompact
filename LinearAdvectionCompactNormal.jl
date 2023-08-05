@@ -8,7 +8,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 3;
 
 # Courant number
 c = 0.5
@@ -20,17 +20,18 @@ Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u = 2.0
+u = 1.0
 
 # Time
 tau = c * h / u
 Ntau = Int(Nx / 10)
-Ntau = 1
+# Ntau = 1
 
 # Initial condition
 # phi_0(x) = piecewiseLinear(x);
+phi_0(x) = piecewiseConstant(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
-phi_0(x) = cos(x);
+# phi_0(x) = cos(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -62,8 +63,8 @@ ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau +
 s = zeros(Nx + 1, Ntau + 1);
 eps = 1e-8;
 
-    # Time loop
-    for n = 1:Ntau
+# Time loop
+for n = 1:Ntau
     # Space loop
     for  i = 2:Nx+1
 

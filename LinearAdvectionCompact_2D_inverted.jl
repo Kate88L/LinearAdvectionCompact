@@ -8,7 +8,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 0;
 
 # Courant number
 c = 2.5;
@@ -27,7 +27,7 @@ U = [1.0, 1.0]
 # Time
 tau = c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
-# Ntau = 2;
+# Ntau = 1;
 
 # Initial condition
 phi_0(x1, x2) = cos.(x1) .* cos.(x2);
@@ -61,7 +61,8 @@ phi_predictor_n2[:, :, 1] = phi_0.(X1, X2);
 ghost_point_time = phi_exact.(X1, X2, -tau);
 
 # ENO parameters
-s = zeros(Nx + 1, Nx + 1, Ntau + 1); 
+sx = zeros(Nx + 1, Nx + 1, Ntau + 1); 
+sy = zeros(Nx + 1, Nx + 1, Ntau + 1); 
 eps = 1e-8;
 
 # Time Loop
@@ -86,74 +87,49 @@ for n = 1:Ntau
         phi_old = ghost_point_time;
     end
 
-    # Fractional step A =====================================================================================================
+    # Space Loop Sweep 1 =====================================================================================================
     for i = 2:Nx + 1
-        j = 2:Nx + 1;
-
-    # First order solution
-        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c * phi_first_order[i - 1, j, n + 1] ) / ( 1 + c );
-        
-    # Predictor
-        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + c * phi_predictor[i - 1, j, n + 1] ) / ( 1 + c );
-
-    # Corrector
-        r_downwind_n_old = phi[i, j, n] - phi[i - 1, j, n];
-        r_upwind_n_old = - phi[i - 1, j, n] + phi_old[i, j];
-
-        r_downwind_n_new = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j, n];
-        r_upwind_n_new = phi[i - 1, j, n + 1] - phi[i, j, n];
-
-    # ENO parameter 
-        for jj = j
-            if n == 1
-                abs(r_downwind_n_old[jj-1]) < eps ? s[i, jj, n] = 0 : s[i, jj, n] = max(0, min(1, r_upwind_n_old[jj-1] / r_downwind_n_old[jj-1]));
-            end
-            abs(r_downwind_n_new[jj-1]) < eps ? s[i, jj, n + 1] = 0 : s[i, jj, n + 1] = max(0, min(1, r_upwind_n_new[jj-1] / r_downwind_n_new[jj-1])); 
-        end
-
-    # Second order solution
-        phi[i, j, n + 1] = ( phi[i, j, n] + c * phi[i - 1, j, n + 1] - 0.5 * ( s[i, j, n] .* r_downwind_n_old 
-                                                                    + s[i, j, n + 1] .* r_downwind_n_new ) ) / ( 1 + c );
-    
-    # Predictor for next time step
-        phi_predictor_n2[i, j, n] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i - 1, j, n] ) / ( 1 + c );
-
-    end
-
-    # Fractional step B =====================================================================================================
     for j = 2:Nx + 1
-        i = 2:Nx + 1;
 
     # First order solution
-        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n + 1] + c * phi_first_order[i, j - 1, n + 1] ) / ( 1 + c );
+        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c * phi_first_order[i - 1, j, n + 1] + c * phi_first_order[i, j - 1, n + 1] ) / ( 1 + 2*c );
         
     # Predictor
-        phi_predictor[i, j, n + 1] = ( phi[i, j, n + 1] + c * phi_predictor[i, j - 1, n + 1] ) / ( 1 + c );
+        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + c * phi_predictor[i - 1, j, n + 1] + c * phi_predictor[i, j - 1, n + 1] ) / ( 1 + 2*c );
 
     # Corrector
-        r_downwind_n_old = phi[i, j, n] - phi[i, j - 1, n + 1];
-        r_upwind_n_old = - phi[i, j - 1, n] + phi_old[i, j];
+        r_downwind_n_old_i = phi[i, j, n] - phi[i - 1, j, n + 1];
+        r_upwind_n_old_i = - phi[i - 1, j, n] + phi_old[i, j];
 
-        r_downwind_n_new = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i, j - 1, n];
-        r_upwind_n_new = phi[i, j - 1, n + 1] - phi[i, j, n+1];
+        r_downwind_n_old_j = phi[i, j, n] - phi[i, j - 1, n + 1];
+        r_upwind_n_old_j = - phi[i, j - 1, n] + phi_old[i, j];
+
+        r_downwind_n_new_i = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j, n];
+        r_upwind_n_new_i = phi[i - 1, j, n + 1] - phi[i, j, n];
+
+        r_downwind_n_new_j = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i, j - 1, n];
+        r_upwind_n_new_j = phi[i, j - 1, n + 1] - phi[i, j, n];
 
     # ENO parameter 
-        for ii = i
-            if n == 1
-                abs(r_downwind_n_old[ii-1]) < eps ? s[ii, j, n] = 0 : s[ii, j, n] = max(0, min(1, r_upwind_n_old[ii-1] / r_downwind_n_old[ii-1]));
-            end
-            abs(r_downwind_n_new[ii-1]) < eps ? s[ii, j, n + 1] = 0 : s[ii, j, n + 1] = max(0, min(1, r_upwind_n_new[ii-1] / r_downwind_n_new[ii-1])); 
+        if n == 1
+            abs(r_downwind_n_old_i) < eps ? sx[i, j, n] = 0 : sx[i, j, n] = max(0, min(1, r_upwind_n_old_i / r_downwind_n_old_i));
+            abs(r_downwind_n_old_j) < eps ? sy[i, j, n] = 0 : sy[i, j, n] = max(0, min(1, r_upwind_n_old_j / r_downwind_n_old_j));
         end
+        abs(r_downwind_n_new_i) < eps ? sx[i, j, n + 1] = 0 : sx[i, j, n + 1] = max(0, min(1, r_upwind_n_new_i / r_downwind_n_new_i));
+        abs(r_downwind_n_new_j) < eps ? sy[i, j, n + 1] = 0 : sy[i, j, n + 1] = max(0, min(1, r_upwind_n_new_j / r_downwind_n_new_j)); 
+
 
     # Second order solution
-        phi[i, j, n + 1] = ( phi[i, j, n + 1] + c * phi[i, j - 1, n + 1] - 0.5 * ( s[i, j, n] .* r_downwind_n_old 
-                                                                                 + s[i, j, n + 1] .* r_downwind_n_new ) ) / ( 1 + c );
+        phi[i, j, n + 1] = ( phi[i, j, n] + c * phi[i - 1, j, n + 1] + c * phi[i, j - 1, n + 1] 
+                                        - 0.5 * ( sx[i, j, n] .* r_downwind_n_old_i + sx[i, j, n + 1] .* r_downwind_n_new_i ) 
+                                        - 0.5 * ( sy[i, j, n] .* r_downwind_n_old_j + sy[i, j, n + 1] .* r_downwind_n_new_j )) / ( 1 + 2*c );
     
     # Predictor for next time step
-        phi_predictor_n2[i, j, n] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i, j - 1, n] ) / ( 1 + c );
+        phi_predictor_n2[i, j, n] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i - 1, j, n] + c * phi_predictor_n2[i, j - 1, n]) / ( 1 + 2*c );
 
     end
-
+    end
+  
 end
 
 # Print the error
@@ -168,7 +144,7 @@ println("Error L_inf firts order: ", norm(phi_first_order[:, :, end] - phi_exact
 
 # trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact scheme solution")
 trace2 = contour(x = x1, y = x2, z = phi_exact.(X1, X2, Ntau * tau), name = "Exact solution", showscale=false, contours_coloring="lines", colorscale = "Black" , line_width=2)
-trace3 = contour(x = x1, y = x2, z = phi[:, :, end], name = "Compact", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
+trace3 = contour(x = x1, y = x2, z = 0*phi[:, :, end], name = "Compact", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
 trace1 = contour(x = x1, y = x2, z = phi_first_order[:, :, end], name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=0.5)
 
 

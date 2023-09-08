@@ -8,10 +8,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 0;
 
 # Courant number
-c = 0.5;
+c = 1.5;
 
 # Grid settings - 2D regular grid
 x1L = -pi/2
@@ -33,7 +33,7 @@ Ntau = Int(Nx / 10)
 phi_0(x1, x2) = cos.(x1) .* cos.(x2);
 
 # Exact solution
-phi_exact(x1, x2, t) = phi_0.(x1 - U[1] * t, x2 - U[2] * t);
+phi_exact(x1, x2, t) = phi_0.(x1 - U[1] .* t, x2 - U[2] .* t);
 
 ## Comptutation
 
@@ -44,7 +44,7 @@ t = range(0, Ntau * tau, length = Ntau + 1)
 
 X1 = repeat(x1, 1, Nx+1)
 X2 = repeat(x2', Nx+1, 1)
-T = repeat(t, 1, Nx+1)
+T = repeat(t, 1, Ntau+1)
 
 phi = zeros(Nx + 1, Nx + 1, Ntau + 1);
 phi_first_order = zeros(Nx + 1, Nx + 1, Ntau + 1);
@@ -59,8 +59,8 @@ phi_predictor[:, :, 1] = phi_0.(X1, X2);
 ghost_point_time = phi_exact.(X1, X2, -tau);
 
 # ENO parameters
-sx = zeros(Nx + 1, Nx + 1, Ntau + 1); 
-sy = zeros(Nx + 1, Nx + 1, Ntau + 1); 
+sx = 0.5; 
+sy = 0.5; 
 eps = 1e-8;
 
 # Time Loop
@@ -116,33 +116,17 @@ for n = 1:Ntau
         phi_predictor[i, j, n + 1] = ( phi_predictor[i, j, n] + c * phi[i - 1, j, n + 1] + c * phi[i, j - 1, n + 1]) / ( 1 + 2*c );
 
     # Corrector
-        r_downwind_i_minus = - phi[i, j, n] + phi[i - 1, j, n + 1];
-        r_upwind_i_minus = - phi[i - 1, j, n] + phi_i_minus_n_plus;
+        r_downwind_i = - phi[i, j, n] + phi_predictor[i - 1, j, n + 1] - phi_predictor[i, j, n + 1] + phi_i_plus;
+        r_upwind_i = - phi[i - 1, j, n] + phi_i_minus_n_plus + phi[i, j, n] - phi[i - 1, j, n + 1];
 
-        r_downwind_j_minus = - phi[i, j, n] + phi[i, j - 1, n + 1];
-        r_upwind_j_minus = - phi[i, j - 1, n] + phi_j_minus_n_plus;
-
-        r_downwind_i = - phi_predictor[i, j, n + 1] + phi_i_plus;
-        r_upwind_i = phi[i, j, n] - phi[i - 1, j, n + 1];
-
-        r_downwind_j = - phi_predictor[i, j, n + 1] + phi_j_plus;
-        r_upwind_j = phi[i, j, n] - phi[i, j - 1, n + 1];
-
-    # ENO parameter 
-        if i == 2
-            abs(r_downwind_i_minus) < eps ? sx[i - 1, j, n + 1] = 0 : sx[i - 1, j, n + 1] = max(0, min(1, r_upwind_i_minus / r_downwind_i_minus));
-        end
-        abs(r_downwind_i) < eps ? sx[i, j, n + 1] = 0 : sx[i, j, n + 1] = max(0, min(1, r_upwind_i / r_downwind_i)); 
-
-        if j == 2
-            abs(r_downwind_j_minus) < eps ? sy[i, j - 1, n + 1] = 0 : sy[i, j - 1, n + 1] = max(0, min(1, r_upwind_j_minus / r_downwind_j_minus));
-        end
-        abs(r_downwind_j) < eps ? sy[i, j, n + 1] = 0 : sy[i, j, n + 1] = max(0, min(1, r_upwind_j / r_downwind_j)); 
-
+        r_downwind_j = - phi[i, j, n] + phi_predictor[i, j - 1, n + 1] - phi_predictor[i, j, n + 1] + phi_j_plus;
+        r_upwind_j = - phi[i, j - 1, n] + phi_j_minus_n_plus + phi[i, j, n] - phi[i, j - 1, n + 1]; 
 
     # Second order solution
-        phi[i, j, n + 1] = ( phi[i, j, n] + c * ( phi[i - 1, j, n + 1] - 0.5 * sx[i - 1, j, n + 1] .* r_downwind_i_minus - 0.5 * sx[i, j, n + 1] .* r_downwind_i ) + 
-                                            c * ( phi[i, j - 1, n + 1] - 0.5 * sy[i, j - 1, n + 1] .* r_downwind_j_minus - 0.5 * sy[i, j, n + 1] .* r_downwind_j ) ) / ( 1 + 2*c );
+        # phi[i, j, n + 1] = ( phi[i, j, n] + c * ( phi[i - 1, j, n + 1] - 0.5 * sx[i - 1, j, n + 1] .* r_downwind_i_minus - 0.5 * sx[i, j, n + 1] .* r_downwind_i ) + 
+        #                                     c * ( phi[i, j - 1, n + 1] - 0.5 * sy[i, j - 1, n + 1] .* r_downwind_j_minus - 0.5 * sy[i, j, n + 1] .* r_downwind_j ) ) / ( 1 + 2*c );
+        phi[i, j, n + 1] = ( phi[i, j, n] + c * ( phi[i - 1, j, n + 1] - 0.5 * (1-sx) .* r_downwind_i - 0.5 * sx .* r_upwind_i ) + 
+                                            c * ( phi[i, j - 1, n + 1] - 0.5 * (1-sy) .* r_downwind_j - 0.5 * sy .* r_upwind_j ) ) / ( 1 + 2*c );
 
     end
     end
@@ -150,10 +134,13 @@ for n = 1:Ntau
 end
 
 # Print the error
-println("Error L2: ", sum(abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))) * h^2)
+
+println("Error L2: ", sum(abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau ))) * h^2)
+# println("Error L2: ", sum(reduce(+, (abs.(phi[:, :, n] - phi_exact.(X1, X2, n * tau)) for n in 1:Ntau)) * tau * h^2))
 println("Error L_inf: ", norm(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau), Inf)* h^2)
 
 # Print first order error
+# println("Error L2 first order: ", sum(reduce(+, (abs.(phi_first_order[:, :, n] - phi_exact.(X1, X2, n * tau)) for n in 1:Ntau)) * tau * h^2))
 println("Error L2 first order: ", sum(abs.(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau))) * h^2)
 println("Error L_inf firts order: ", norm(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau), Inf)* h^2)
 

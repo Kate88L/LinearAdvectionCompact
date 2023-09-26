@@ -2,21 +2,24 @@
 
 using LinearAlgebra
 using PlotlyJS
+using LaTeXStrings
+using CSV
+using DataFrames
 
 include("InitialFunctions.jl")
 
 ## Definition of basic parameters
 
 # Level of refinement
-level = 5;
+level = 4;
 
 # Courant number
-c = 15
+c = 5
 
 # Grid settings
 xL = - 1
 xR = 1
-Nx = 80 * 2^level
+Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
@@ -118,32 +121,24 @@ for n = 1:Ntau
     end
 end
 
-# Print the error
-println("Error L2: ", sum(abs.(phi[:,end] - phi_exact.(x, Ntau * tau))) * h)
+println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
 
 # Print first order error
-println("Error L2 first order: ", sum(abs.(phi_first_order[:,end] - phi_exact.(x, Ntau * tau))) * h)
+println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf)* h)
 
 # Plot of the result at the final time together with the exact solution
-trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact scheme solution")
-trace2 = scatter(x = x, y = phi_exact.(x, Ntau * tau), mode = "lines", name = "Exact solution")
-trace3 = scatter(x = x, y = phi_first_order[:, end], mode = "lines", name = "First order solution")
+trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", line=attr(color="firebrick", width=2))
+trace2 = scatter(x = x, y = phi_exact.(x, Ntau * tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
+trace3 = scatter(x = x, y = phi_first_order[:, end], mode = "lines", name = "First-order", line=attr(color="royalblue", width=2))
 
-layout = Layout(title = "Linear advection equation", xaxis_title = "x", yaxis_title = "phi")
 
+
+layout = Layout(plot_bgcolor="white", 
+                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 plot_phi = plot([trace1, trace2, trace3], layout)
 
-# Plot of the numerical derivative of the solution and the exact solution at the final time
-trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
-trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
-trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
+plot_phi
 
-layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
-
-plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
-
-p = [plot_phi; plod_d_phi]
-relayout!(p, width = 1000, height = 500)
-p
+# CSV.write("data.csv", DataFrame(phi,:auto))

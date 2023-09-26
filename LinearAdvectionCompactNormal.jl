@@ -8,14 +8,14 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 5;
 
 # Courant number
-c = 0.5
+c = 15
 
 # Grid settings
-xL = - 1 * pi/2
-xR = 1 * pi
+xL = - 1
+xR = 1
 Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
@@ -29,9 +29,10 @@ Ntau = Int(Nx / 10)
 
 # Initial condition
 # phi_0(x) = piecewiseLinear(x);
-phi_0(x) = piecewiseConstant(x);
+# phi_0(x) = piecewiseConstant(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 # phi_0(x) = cos(x);
+phi_0(x) = makePeriodic(allInOne,-1,1)(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -94,14 +95,25 @@ for n = 1:Ntau
         r_upwind_i = phi[i, n] - phi[i - 1, n + 1];
 
         # ENO parameter
-        if i == 2
-            abs(r_downwind_i_minus) < eps ? s[i - 1, n + 1] = 0 : s[i - 1, n + 1] = max(0, min(1, r_upwind_i_minus / r_downwind_i_minus));
+        # if i == 2
+        #     abs(r_downwind_i_minus) < eps ? s[i - 1, n + 1] = 0 : s[i - 1, n + 1] = max(0, min(1, r_upwind_i_minus / r_downwind_i_minus));
+        # end
+
+        # abs(r_downwind_i) <  eps ? s[i, n + 1] = 0 : s[i, n + 1] = max(0, min(1, r_upwind_i / r_downwind_i)); 
+
+        if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
+            s[i,n+1] = 1
+        else
+            s[i,n+1] = 0
         end
 
-        abs(r_downwind_i) <  eps ? s[i, n + 1] = 0 : s[i, n + 1] = max(0, min(1, r_upwind_i / r_downwind_i)); 
-
         # Second order solution
-        phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * s[i - 1, n + 1] * r_downwind_i_minus - 0.5 * s[i, n + 1] * r_downwind_i ) ) / ( 1 + c );
+        # phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * s[i - 1, n + 1] * r_downwind_i_minus - 0.5 * s[i, n + 1] * r_downwind_i ) ) / ( 1 + c );
+
+
+        phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) 
+        - 0.5 * (1-s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) ) / ( 1 + c );
+
 
     end
 end

@@ -27,8 +27,8 @@ tau = c * h / u
 Ntau = Int(Nx / 10)
 
 # Initial condition
-phi_0(x) = makePeriodic(allInOne,-1,1)(x);
-# phi_0(x) = cos(x);
+# phi_0(x) = makePeriodic(allInOne,-1,1)(x);
+phi_0(x) = cos(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -101,7 +101,7 @@ for n = 1:Ntau
         phi_predictor_n[i, n + 1] = ( phi[i, n] + c * phi_predictor_n[i - 1, n + 1] ) / ( 1 + c );
 
         # Corrector
-        r_downwind_i_minus = phi_predictor_i[i - 1, n + 1] - phi[i, n];
+        r_downwind_i_minus = phi[i - 1, n + 1] - phi[i, n];
         r_upwind_i_minus = - phi[i - 1, n] + phi_left_n_plus;
 
         r_downwind_i = - phi_predictor_i[i, n + 1] + phi_right_n;

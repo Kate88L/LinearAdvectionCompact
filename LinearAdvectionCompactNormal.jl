@@ -11,10 +11,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
+level = 0;
 
 # Courant number
-c = 5
+C = 0.5
 
 # Grid settings
 xL = - 1
@@ -23,12 +23,14 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u = 1.0
+u = -1.0
 
 # Time
-tau = c * h / u
+tau = C * h / abs(u)
 Ntau = Int(Nx / 10)
 # Ntau = 1
+
+c = u * tau / h
 
 # Initial condition
 # phi_0(x) = piecewiseLinear(x);
@@ -58,6 +60,10 @@ phi[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_predictor[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 
+phi[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+phi_first_order[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+phi_predictor[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+
 # Ghost point on the right side (u > 0)
 ghost_point_right = phi_exact.(xR + h, range(0, Ntau * tau, length = Ntau + 1));
 # Ghost point on the left side 
@@ -70,40 +76,36 @@ eps = 1e-8;
 # Time loop
 for n = 1:Ntau
     # Space loop
-    for  i = 2:Nx+1
+    for  i = 2:1:Nx
 
-        if i < Nx + 1
-            phi_right = phi[i + 1, n];
+        if i < Nx 
+            phi_right = phi[i + 2, n + 1];
         else
             phi_right = ghost_point_right[n];
         end
 
         if i > 2
-            phi_left_n_plus = phi[i - 2, n + 1];
+            phi_left = phi[i - 2, n + 1];
         else
-            phi_left_n_plus = ghost_point_left[n];
+            phi_left = ghost_point_left[n];
         end
 
         # First order solution
-        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c * phi_first_order[i - 1, n + 1] ) / ( 1 + c );
+        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c) * (c > 0) * phi_first_order[i - 1, n + 1] 
+                                                            + abs(c) * (c < 0) * phi_first_order[i + 1, n + 1] ) / ( 1 + abs(c) );
         
         # Predictor
-        phi_predictor[i, n + 1] = ( phi_predictor[i, n] + c * phi[i - 1, n + 1] ) / ( 1 + c );
+        phi_predictor[i, n + 1] = ( phi_predictor[i, n] + abs(c) * (c > 0) * phi[i - 1, n + 1] 
+                                                        + abs(c) * (c < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c) );
 
         # Corrector
-        r_downwind_i_minus = - phi[i, n] + phi_predictor[i - 1, n + 1];
-        r_upwind_i_minus = - phi[i - 1, n] + phi_left_n_plus;
+        r_downwind_i_minus = - phi[i, n] + (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1];
+        r_upwind_i_minus = - (c > 0) * phi[i - 1, n] - (c < 0) * phi[i + 1, n] + (c > 0) * phi_left + (c < 0) * phi_right;
 
-        r_downwind_i = - phi_predictor[i, n + 1] + phi_right;
-        r_upwind_i = phi[i, n] - phi[i - 1, n + 1];
+        r_downwind_i = - phi_predictor[i, n + 1] + (c > 0) * phi[i + 1, n] + (c < 0) * phi[i - 1, n];
+        r_upwind_i = phi[i, n] - (c > 0) * phi[i - 1, n + 1] - (c < 0) * phi[i + 1, n + 1];
 
         # ENO parameter
-        # if i == 2
-        #     abs(r_downwind_i_minus) < eps ? s[i - 1, n + 1] = 0 : s[i - 1, n + 1] = max(0, min(1, r_upwind_i_minus / r_downwind_i_minus));
-        # end
-
-        # abs(r_downwind_i) <  eps ? s[i, n + 1] = 0 : s[i, n + 1] = max(0, min(1, r_upwind_i / r_downwind_i)); 
-
         if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
             s[i,n+1] = 1
         else
@@ -111,14 +113,50 @@ for n = 1:Ntau
         end
 
         # Second order solution
-        # phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * s[i - 1, n + 1] * r_downwind_i_minus - 0.5 * s[i, n + 1] * r_downwind_i ) ) / ( 1 + c );
-
-
-        phi[i, n + 1] = ( phi[i, n] + c * ( phi[i - 1, n + 1] - 0.5 * s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) 
-        - 0.5 * (1-s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) ) / ( 1 + c );
-
-
+        phi[i, n + 1] = ( phi[i, n] + abs(c) * ( (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1] - 0.5 * s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) - 0.5 * (1-s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) ) / ( 1 + abs(c) );
     end
+
+    for  i = Nx:-1:2
+
+        if i < Nx 
+            phi_right = phi[i + 2, n + 1];
+        else
+            phi_right = ghost_point_right[n];
+        end
+
+        if i > 2
+            phi_left = phi[i - 2, n + 1];
+        else
+            phi_left = ghost_point_left[n];
+        end
+
+        # First order solution
+        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c) * (c > 0) * phi_first_order[i - 1, n + 1] 
+                                                            + abs(c) * (c < 0) * phi_first_order[i + 1, n + 1] ) / ( 1 + abs(c) );
+        
+        # Predictor
+        phi_predictor[i, n + 1] = ( phi_predictor[i, n] + abs(c) * (c > 0) * phi[i - 1, n + 1] 
+                                                        + abs(c) * (c < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c) );
+
+        # Corrector
+        r_downwind_i_minus = - phi[i, n] + (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1];
+        r_upwind_i_minus = - (c > 0) * phi[i - 1, n] - (c < 0) * phi[i + 1, n] + (c > 0) * phi_left + (c < 0) * phi_right;
+
+        r_downwind_i = - phi_predictor[i, n + 1] + (c > 0) * phi[i + 1, n] + (c < 0) * phi[i - 1, n];
+        r_upwind_i = phi[i, n] - (c > 0) * phi[i - 1, n + 1] - (c < 0) * phi[i + 1, n + 1];
+
+        # ENO parameter
+        if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
+            s[i,n+1] = 1
+        else
+            s[i,n+1] = 0
+        end
+
+        # Second order solution
+        phi[i, n + 1] = ( phi[i, n] + abs(c) * ( (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1] - 0.5 * s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) 
+        - 0.5 * (1-s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) ) / ( 1 + abs(c) );
+    end
+
 end
 
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)

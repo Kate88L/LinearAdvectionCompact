@@ -8,7 +8,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 4;
 
 # Courant number
 C = 4;
@@ -37,8 +37,10 @@ phi_exact(x, t) = sin.(2 * atan.( tan.(x / 2) * exp.(-t) ));
 x = range(xL, xR, length = Nx + 1)
 
 # Time
+T = 2.0;
 tau = C * h / maximum(abs.(u.(x)))
-Ntau = Int(Nx / 50)
+Ntau = Int(Nx / 100)
+tau = T / Ntau
 # Ntau = 1
 
 c = u.(x) * tau / h
@@ -216,12 +218,17 @@ for n = 1:Ntau
     end
 end
 
+# Print error
+Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
+println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
 
 # Print first order error
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf)* h)
+
+println("=============================")
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", line=attr(color="firebrick", width=2))

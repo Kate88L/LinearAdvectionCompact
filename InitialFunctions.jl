@@ -51,6 +51,18 @@ function allInOne(x)
     end
 end
 
+function continuesMix(x)
+    if - 2/3 <= x < 0.
+        return - (3*x+1)^2 + 1
+    elseif 0.4 <= x < 0.6
+        return 5 * (x - 0.4)
+    elseif 0.6 <= x < 0.8
+        return -5 * (x - 0.8)
+    else
+        return 0.0
+    end
+end
+
 # Function to convert a function f to a periodic function on interval xL, xR
 function makePeriodic(f, xL, xR)
     return x -> f(mod(x - xL, xR - xL) + xL)

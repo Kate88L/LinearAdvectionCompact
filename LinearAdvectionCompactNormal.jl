@@ -11,10 +11,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 2;
 
 # Courant number
-C = 0.5
+C = 5
 
 # Grid settings
 xL = - 1
@@ -23,7 +23,7 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u = -1.0
+u = 1.0
 
 # Time
 tau = C * h / abs(u)
@@ -37,7 +37,8 @@ c = u * tau / h
 # phi_0(x) = piecewiseConstant(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 # phi_0(x) = cos(x);
-phi_0(x) = makePeriodic(allInOne,-1,1)(x);
+# phi_0(x) = makePeriodic(allInOne,-1,1)(x);
+phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -99,7 +100,7 @@ for n = 1:Ntau
                                                         + abs(c) * (c < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c) );
 
         # Corrector
-        r_downwind_i_minus = - phi[i, n] + (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1];
+        r_downwind_i_minus = - phi[i, n] + (c > 0) * phi_predictor[i - 1, n + 1] + (c < 0) * phi_predictor[i + 1, n + 1];
         r_upwind_i_minus = - (c > 0) * phi[i - 1, n] - (c < 0) * phi[i + 1, n] + (c > 0) * phi_left + (c < 0) * phi_right;
 
         r_downwind_i = - phi_predictor[i, n + 1] + (c > 0) * phi[i + 1, n] + (c < 0) * phi[i - 1, n];
@@ -139,7 +140,7 @@ for n = 1:Ntau
                                                         + abs(c) * (c < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c) );
 
         # Corrector
-        r_downwind_i_minus = - phi[i, n] + (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1];
+        r_downwind_i_minus = - phi[i, n] + (c > 0) * phi_predictor[i - 1, n + 1] + (c < 0) * phi_predictor[i + 1, n + 1];
         r_upwind_i_minus = - (c > 0) * phi[i - 1, n] - (c < 0) * phi[i + 1, n] + (c > 0) * phi_left + (c < 0) * phi_right;
 
         r_downwind_i = - phi_predictor[i, n + 1] + (c > 0) * phi[i + 1, n] + (c < 0) * phi[i - 1, n];
@@ -178,5 +179,18 @@ layout = Layout(plot_bgcolor="white",
 plot_phi = plot([trace1, trace2, trace3], layout)
 
 plot_phi
+
+# Plot of the numerical derivative of the solution and the exact solution at the final time
+trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
+trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
+trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
+
+layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
+
+plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
+
+p = [plot_phi; plod_d_phi]
+relayout!(p, width = 1000, height = 500)
+p
 
 # CSV.write("data.csv", DataFrame(phi,:auto))

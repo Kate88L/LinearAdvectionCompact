@@ -26,11 +26,11 @@ u_im_np = u_i_n - h * DX + tau * DT +
                 (h^3 / 6) * DXXX + (tau^3 / 6) * DTTT - (h^2 * tau / 2) * DXXT - (h * tau^2 / 2) * DXTT
 
 # Predictors
-# uP_i_n = u_i_nm - c * (u_i_n - u_im_n);
-uP_i_n = (u_i_nm + c * u_im_n) / (1 + c);
-# uP_im_n = u_im_nm - c * (u_im_n - u_imm_n);
-uP_im_n = (u_im_nm + c * u_imm_n) / (1 + c);
-uP_im_np = 0;
+uP_i_n = ( u_i_nm + c * u_im_n ) / (1 + c);
+# uP_i_n = u_i_nm + tau * DT;
+uP_im_n = ( u_im_nm + c * u_imm_n ) / (1 + c);
+# uP_im_n = uP_i_n - h * DX + (h^2 / 2) * DXX;
+uP_im_np = uP_im_n + tau * DT;
 
 
 # Final scheme
@@ -38,24 +38,29 @@ uP_im_np = 0;
 # w = 1/2
 
 f_normal = (u_i_n - u_i_nm) + c *(u_i_n - u_im_n) + 
-    c / 2 * ( (1 - w) * ( u_ip_nm - u_i_nm - u_i_n + u_im_n ) + 
+    c / 2 * ( (1 - w) * ( u_ip_nm - u_i_nm - uP_i_n + uP_im_n ) + 
                    w * ( u_i_nm - u_im_nm - u_im_n + u_imm_n ) );
 
 f_inverted = (u_i_n - u_i_nm) + c * (u_i_n - u_im_n) + 
-    1 / 2 * ( (1 - s) * ( u_im_np - u_im_n - u_i_n + u_i_nm ) + 
+    1 / 2 * ( (1 - s) * ( uP_im_np - u_im_n - uP_i_n + u_i_nm ) + 
                    s * ( u_im_n - u_im_nm - u_i_nm + u_i_nmm ) );
 
 f_normal = f_normal.subs(DT, - a * DX)
-f_inverted = f_inverted.subs(DT, - a * DX)
+f_inverted = f_inverted.subs(DX, - 1/a * DT)
 f_normal = f_normal.subs(DTT, - a * DXT)
-f_inverted = f_inverted.subs(DTT, - a * DXT)
+f_inverted = f_inverted.subs(DXX, - 1/a * DXT)
 
 # Courant number
 f_normal = f_normal.subs(c, a * tau / h)
 f_inverted = f_inverted.subs(c, a * tau / h)
 
+f_normal = f_normal.subs(DTTT, -a^3 * DXXX)
+f_normal = f_normal.subs(DXTT, a^2 * DXXX)
+f_normal = f_normal.subs(DXXT, -a * DXXX)
+f_normal = f_normal.subs(DXT, -a * DXX)
+
 simplified_f_normal = cancel(expand(f_normal))
-simplified_f_inverted = simplify(f_inverted)
+simplified_f_inverted = cancel(expand(f_inverted))
 
 # Print the result in a readable format
 println(simplified_f_normal)

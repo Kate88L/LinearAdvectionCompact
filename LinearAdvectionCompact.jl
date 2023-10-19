@@ -24,7 +24,7 @@ h = (xR - xL) / Nx
 # Velocity
 # u = 1
 # u(x) = sin(x) 
-u(x) = 2 + cos(x)
+u(x) = 2 + 3/2 * cos(x)
 
 # Initial condition
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
@@ -35,7 +35,8 @@ phi_0(x) = cos(x);
 # Exact solution
 # phi_exact(x, t) = phi_0(x - u * t);
 # phi_exact(x, t) = sin.(2 * atan.( tan.(x / 2) * exp.(-t) ));
-phi_exact(x, t) = cos(2*atan(sqrt(3)*tan((sqrt(3).*(t - (2*atan(tan(x/2.)./sqrt(3)))./sqrt(3)))/2.)))
+phi_exact(x, t) = cos.(2*atan.(sqrt(7).*tan((sqrt(7).*(t - (4*atan.(tan.(x/2)./sqrt(7)))./sqrt(7)))/4)))
+                
 
 ## Comptutation
 
@@ -43,9 +44,9 @@ phi_exact(x, t) = cos(2*atan(sqrt(3)*tan((sqrt(3).*(t - (2*atan(tan(x/2.)./sqrt(
 x = range(xL, xR, length = Nx + 1)
 
 # Time
-T = 2 * pi / sqrt(3)
+T = pi / sqrt(3)
 # tau = C * h / u
-Ntau = 2 * 2^level
+Ntau = 30 * 2^level
 tau = T / Ntau
 # Ntau = 1
 
@@ -253,17 +254,17 @@ println("=============================")
 
 # Plot of the result at the final time together with the exact solution
 # trace1 = scatter(x = x, y = phi_8[:,end], mode = "lines", name = "Compact TVD C = 8", line=attr(color="firebrick", width=2))
-trace2 = scatter(x = x, y = phi_exact.(x, Ntau * tau), mode = "lines", name = "Exact", line=attr(color="black", width=2, dash="dash") )
-# trace3 = scatter(x = x, y = phi_08[:,end], mode = "lines", name = "Compact TVD C = 0.8", line=attr(color="royalblue", width=2))
+trace2 = scatter(x = x, y = phi_exact.(x, Ntau*tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
+trace1 = scatter(x = x, y = phi_0.(x), mode = "lines", name = "Initial Condition", line=attr(color="black", width=1, dash = "dash") )
 # trace4 = scatter(x = x, y = phi_1[:,end], mode = "lines", name = "Compact TVD C = 1", line=attr(color="green", width=2))
 # trace5 = scatter(x = x, y = phi_16[:,end], mode = "lines", name = "Compact TVD C = 1.6", line=attr(color="orange", width=2))
-trace3 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", line=attr(color="black", width=1, dash="dash"))
+trace3 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", line=attr(color="firebrick", width=2))
 
 
 layout = Layout(plot_bgcolor="white", 
                 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 # plot_phi = plot([ trace2, trace1,trace5, trace4, trace3], layout)
-plot_phi = plot([ trace2, trace3], layout)
+plot_phi = plot([ trace1, trace2, trace3], layout)
 
 plot_phi
 

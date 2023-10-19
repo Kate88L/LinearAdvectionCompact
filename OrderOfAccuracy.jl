@@ -40,7 +40,7 @@ f_normal = (u_i_n - u_i_nm) + c *(u_i_n - u_im_n) +
                    w * ( u_i_nm - u_im_nm - u_im_n + u_imm_n ) );
 
 f_inverted = (u_i_n - u_i_nm) + c * (u_i_n - u_im_n) + 
-    1 / 2 * ( (1 - s) * ( u_im_np - u_im_n - u_i_n + u_i_nm ) + 
+    1 / 2 * ( (1 - s) * ( uP_im_np - u_im_n - uP_i_n + u_i_nm ) + 
                    s * ( u_im_n - u_im_nm - u_i_nm + u_i_nmm ) );
 
 f_normal = f_normal.subs(DT, - a * DX)

@@ -25,18 +25,18 @@ h = (xR - xL) / Nx
 # Velocity
 u = 1.0
 
-# Time
-tau = C * h / abs(u)
-Ntau = Int(Nx / 10)
-# Ntau = 1
+# Time settings
+T = 1
+Ntau = 10 * 2^level
+tau = T / Ntau
 
 c = u * tau / h
 
 # Initial condition
 # phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = piecewiseConstant(x);
-# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
-phi_0(x) = cos(x);
+phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+# phi_0(x) = cos(x);
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
 # phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
 
@@ -100,10 +100,10 @@ for n = 1:Ntau
                                                         + abs(c) * (c < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c) );
 
         # Corrector
-        r_downwind_i_minus = - phi[i, n] + (c > 0) * phi_predictor[i - 1, n + 1] + (c < 0) * phi_predictor[i + 1, n + 1];
+        r_downwind_i_minus = - phi_predictor[i, n] + (c > 0) * phi_predictor[i - 1, n + 1] + (c < 0) * phi_predictor[i + 1, n + 1];
         r_upwind_i_minus = - (c > 0) * phi[i - 1, n] - (c < 0) * phi[i + 1, n] + (c > 0) * phi_left + (c < 0) * phi_right;
 
-        r_downwind_i = - phi_predictor[i, n + 1] + (c > 0) * phi[i + 1, n] + (c < 0) * phi[i - 1, n];
+        r_downwind_i = - phi_predictor[i, n + 1] + (c > 0) * phi_predictor[i + 1, n] + (c < 0) * phi_predictor[i - 1, n];
         r_upwind_i = phi[i, n] - (c > 0) * phi[i - 1, n + 1] - (c < 0) * phi[i + 1, n + 1];
 
         # ENO parameter
@@ -116,47 +116,6 @@ for n = 1:Ntau
         # Second order solution
         phi[i, n + 1] = ( phi[i, n] + abs(c) * ( (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1] - 0.5 * s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) - 0.5 * (1-s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) ) / ( 1 + abs(c) );
     end
-
-    # for  i = Nx:-1:2
-
-    #     if i < Nx 
-    #         phi_right = phi[i + 2, n + 1];
-    #     else
-    #         phi_right = ghost_point_right[n];
-    #     end
-
-    #     if i > 2
-    #         phi_left = phi[i - 2, n + 1];
-    #     else
-    #         phi_left = ghost_point_left[n];
-    #     end
-
-    #     # First order solution
-    #     phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c) * (c > 0) * phi_first_order[i - 1, n + 1] 
-    #                                                         + abs(c) * (c < 0) * phi_first_order[i + 1, n + 1] ) / ( 1 + abs(c) );
-        
-    #     # Predictor
-    #     phi_predictor[i, n + 1] = ( phi_predictor[i, n] + abs(c) * (c > 0) * phi[i - 1, n + 1] 
-    #                                                     + abs(c) * (c < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c) );
-
-    #     # Corrector
-    #     r_downwind_i_minus = - phi[i, n] + (c > 0) * phi_predictor[i - 1, n + 1] + (c < 0) * phi_predictor[i + 1, n + 1];
-    #     r_upwind_i_minus = - (c > 0) * phi[i - 1, n] - (c < 0) * phi[i + 1, n] + (c > 0) * phi_left + (c < 0) * phi_right;
-
-    #     r_downwind_i = - phi_predictor[i, n + 1] + (c > 0) * phi[i + 1, n] + (c < 0) * phi[i - 1, n];
-    #     r_upwind_i = phi[i, n] - (c > 0) * phi[i - 1, n + 1] - (c < 0) * phi[i + 1, n + 1];
-
-    #     # ENO parameter
-    #     if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
-    #         s[i,n+1] = 1
-    #     else
-    #         s[i,n+1] = 0
-    #     end
-
-    #     # Second order solution
-    #     phi[i, n + 1] = ( phi[i, n] + abs(c) * ( (c > 0) * phi[i - 1, n + 1] + (c < 0) * phi[i + 1, n + 1] - 0.5 * s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) 
-    #     - 0.5 * (1-s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) ) / ( 1 + abs(c) );
-    # end
 
 end
 

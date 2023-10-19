@@ -126,13 +126,13 @@ for n = 1:Ntau
                                                  + abs(c[i]) * (c[i] < 0) * phi_predictor_n[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         # Corrector
-        r_downwind_i_minus = - phi[i, n] + (c[i] > 0) * phi_predictor_i[i - 1, n + 1] + (c[i] < 0) * phi_predictor_i[i + 1, n + 1];
+        r_downwind_i_minus = - phi_predictor_i[i, n] + (c[i] > 0) * phi_predictor_i[i - 1, n + 1] + (c[i] < 0) * phi_predictor_i[i + 1, n + 1];
         r_upwind_i_minus = - (c[i] > 0) * phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + (c[i] > 0) * phi_left + (c[i] < 0) * phi_right;
 
         r_downwind_i = - phi_predictor_i[i, n + 1] + (c[i] > 0) * phi_predictor_i[i + 1, n] + (c[i] < 0) * phi_predictor_i[i - 1, n];
         r_upwind_i = phi[i, n] - (c[i] > 0) * phi[i - 1, n + 1] - (c[i] < 0) * phi[i + 1, n + 1];
 
-        r_downwind_n_old = phi[i, n] - (c[i] > 0) * phi[i - 1, n + 1] - (c[i] < 0) * phi[i + 1, n + 1];
+        r_downwind_n_old = phi_predictor_n[i, n] - (c[i] > 0) * phi_predictor_n[i - 1, n + 1] - (c[i] < 0) * phi_predictor_n[i + 1, n + 1];
         r_upwind_n_old = - (c[i] > 0) *  phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + phi_old[i];
 
         r_downwind_n_new = - phi_predictor_n[i, n + 1] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] + (c[i] < 0) * phi_predictor_n2[i + 1, n + 1];
@@ -189,16 +189,16 @@ for n = 1:Ntau
                                                  + abs(c[i]) * (c[i] < 0) * phi_predictor_n[i + 1, n + 1]  ) / ( 1 + abs(c[i]) );
 
         # Corrector
-        r_downwind_i_minus = - phi[i, n] + (c[i] > 0) * phi_predictor_i[i - 1, n + 1] + (c[i] < 0) * phi_predictor_i[i + 1, n + 1];
+        r_downwind_i_minus = - phi_predictor_i[i, n] + (c[i] > 0) * phi_predictor_i[i - 1, n + 1] + (c[i] < 0) * phi_predictor_i[i + 1, n + 1];
         r_upwind_i_minus = - (c[i] > 0) * phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + (c[i] > 0) * phi_left + (c[i] < 0) * phi_right;
 
-        r_downwind_i = - phi_predictor_i[i, n + 1] + (c[i] > 0) * phi[i + 1, n] + (c[i] < 0) * phi[i - 1, n];
+        r_downwind_i = - phi_predictor_i[i, n + 1] + (c[i] > 0) * phi_predictor_i[i + 1, n] + (c[i] < 0) * phi_predictor_i[i - 1, n];
         r_upwind_i = phi[i, n] - (c[i] > 0) * phi[i - 1, n + 1] - (c[i] < 0) * phi[i + 1, n + 1];
 
-        r_downwind_n_old = phi[i, n] - (c[i] > 0) * phi[i - 1, n + 1] - (c[i] < 0) * phi[i + 1, n + 1];
+        r_downwind_n_old = phi_predictor_n[i, n] - (c[i] > 0) * phi_predictor_n[i - 1, n + 1] - (c[i] < 0) * phi_predictor_n[i + 1, n + 1];
         r_upwind_n_old = - (c[i] > 0) *  phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + phi_old[i];
 
-        r_downwind_n_new = - phi_predictor_i[i, n + 1] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] + (c[i] < 0) * phi_predictor_n2[i + 1, n + 1];
+        r_downwind_n_new = - phi_predictor_n[i, n + 1] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] + (c[i] < 0) * phi_predictor_n2[i + 1, n + 1];
         r_upwind_n_new = (c[i] > 0) * phi[i - 1, n + 1] + (c[i] < 0) * phi[i + 1, n + 1] - phi[i, n];
 
 

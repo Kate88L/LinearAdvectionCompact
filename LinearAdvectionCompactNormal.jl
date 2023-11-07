@@ -2,7 +2,6 @@
 
 using LinearAlgebra
 using PlotlyJS
-using LaTeXStrings
 using CSV
 using DataFrames
 
@@ -130,7 +129,6 @@ println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", line=attr(color="firebrick", width=2))
 trace2 = scatter(x = x, y = phi_exact.(x, Ntau * tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
 trace3 = scatter(x = x, y = phi_first_order[:, end], mode = "lines", name = "First-order", line=attr(color="royalblue", width=2))
-
 
 
 layout = Layout(plot_bgcolor="white", 

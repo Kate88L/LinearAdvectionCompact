@@ -10,7 +10,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
+level = 1;
 
 # Courant number
 C = 5
@@ -40,8 +40,8 @@ c = zeros(Nx+1,1) .+ u * tau / h
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
 # phi_0(x) = piecewiseConstant(x);
 # phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
-# phi_0(x) = cos(x);
-phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+phi_0(x) = cos(x);
+# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -102,7 +102,7 @@ for n = 1:Ntau
         r_upwind_n_old = - (c[i] > 0) *  phi[i - 1, n] + phi_old[i];
 
         r_downwind_n_new = - phi_predictor[i, n + 1] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1];
-        r_upwind_n_new = (c[i] > 0) * phi[i - 1, n + 1];
+        r_upwind_n_new = (c[i] > 0) * phi[i - 1, n + 1] - phi[i, n];
 
         # ENO parameter 
         if abs(r_downwind_n_new + r_downwind_n_old) <= abs(r_upwind_n_new + r_upwind_n_old)

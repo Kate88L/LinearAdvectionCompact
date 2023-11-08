@@ -11,14 +11,15 @@ include("InitialFunctions.jl")
 level = 0;
 
 # Courant number
-c = 2.5;
+c = 4;
+d = c;
 
 # Grid settings - 2D regular grid
 x1L = -pi/2
 x1R = pi
 x2L = -pi/2
 x2R = pi
-Nx = 80 * 2^level
+Nx = 100 * 2^level
 h = (x1R - x1L) / Nx
 
 # Velocity
@@ -27,7 +28,6 @@ U = [1.0, 1.0]
 # Time
 tau = c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
-# Ntau = 1;
 
 # Initial condition
 phi_0(x1, x2) = cos.(x1) .* cos.(x2);
@@ -55,14 +55,13 @@ phi_predictor_n2 = zeros(Nx + 1, Nx + 1, Ntau + 1); # predictor in time n+2
 phi[:, :, 1] = phi_0.(X1, X2);
 phi_first_order[:, :, 1] = phi_0.(X1, X2);
 phi_predictor[:, :, 1] = phi_0.(X1, X2);
-phi_predictor_n2[:, :, 1] = phi_0.(X1, X2);
 
 # Ghost point on the time -1
 ghost_point_time = phi_exact.(X1, X2, -tau);
 
 # ENO parameters
-sx = zeros(Nx + 1, Nx + 1, Ntau + 1); 
-sy = zeros(Nx + 1, Nx + 1, Ntau + 1); 
+px = zeros(Nx + 1, Nx + 1, Ntau + 1); 
+py = zeros(Nx + 1, Nx + 1, Ntau + 1); 
 eps = 1e-8;
 
 # Time Loop
@@ -78,8 +77,8 @@ for n = 1:Ntau
     phi_predictor[1, :, n + 1] = phi_exact.(x1[1], x2, n * tau);
     phi_predictor[:, 1, n + 1] = phi_exact.(x1, x2[1], n * tau);
 
-    phi_predictor_n2[1, :, n] = phi_exact.(x1[1], x2, (n + 1) * tau);
-    phi_predictor_n2[:, 1, n] = phi_exact.(x1, x2[1], (n + 1) * tau);
+    phi_predictor_n2[1, :, n + 1] = phi_exact.(x1[1], x2, (n + 1) * tau);
+    phi_predictor_n2[:, 1, n + 1] = phi_exact.(x1, x2[1], (n + 1) * tau);
 
     if n > 1
         phi_old = phi[:, :, n - 1];
@@ -88,44 +87,44 @@ for n = 1:Ntau
     end
 
     # Space Loop Sweep 1 =====================================================================================================
-    for i = 2:Nx + 1
-    for j = 2:Nx + 1
+    for i = 2:1:Nx + 1
+    for j = 2:1:Nx + 1
 
     # First order solution
-        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c * phi_first_order[i - 1, j, n + 1] + c * phi_first_order[i, j - 1, n + 1] ) / ( 1 + 2*c );
+        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c * phi_first_order[i - 1, j, n + 1] + d * phi_first_order[i, j - 1, n + 1] ) / ( 1 + c + d );
         
     # Predictor
-        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + c * phi_predictor[i - 1, j, n + 1] + c * phi_predictor[i, j - 1, n + 1] ) / ( 1 + 2*c );
+        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + c * phi_predictor[i - 1, j, n + 1] + d * phi_predictor[i, j - 1, n + 1] ) / ( 1 + c + d );
 
     # Corrector
-        r_downwind_n_old_i = phi[i, j, n] - phi[i - 1, j, n + 1];
+        r_downwind_n_old_i = phi_predictor[i, j, n] - phi_predictor[i - 1, j, n + 1];
         r_upwind_n_old_i = - phi[i - 1, j, n] + phi_old[i, j];
 
-        r_downwind_n_old_j = phi[i, j, n] - phi[i, j - 1, n + 1];
-        r_upwind_n_old_j = - phi[i, j - 1, n] + phi_old[i, j];
-
-        r_downwind_n_new_i = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j, n];
+        r_downwind_n_new_i = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j, n + 1];
         r_upwind_n_new_i = phi[i - 1, j, n + 1] - phi[i, j, n];
 
-        r_downwind_n_new_j = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i, j - 1, n];
+        r_downwind_n_old_j = phi_predictor[i, j, n] - phi_predictor[i, j - 1, n + 1];
+        r_upwind_n_old_j = - phi[i, j - 1, n] + phi_old[i, j];
+
+        r_downwind_n_new_j = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i, j - 1, n + 1];
         r_upwind_n_new_j = phi[i, j - 1, n + 1] - phi[i, j, n];
 
-    # ENO parameter 
-        if n == 1
-            abs(r_downwind_n_old_i) < eps ? sx[i, j, n] = 0 : sx[i, j, n] = max(0, min(1, r_upwind_n_old_i / r_downwind_n_old_i));
-            abs(r_downwind_n_old_j) < eps ? sy[i, j, n] = 0 : sy[i, j, n] = max(0, min(1, r_upwind_n_old_j / r_downwind_n_old_j));
-        end
-        abs(r_downwind_n_new_i) < eps ? sx[i, j, n + 1] = 0 : sx[i, j, n + 1] = max(0, min(1, r_upwind_n_new_i / r_downwind_n_new_i));
-        abs(r_downwind_n_new_j) < eps ? sy[i, j, n + 1] = 0 : sy[i, j, n + 1] = max(0, min(1, r_upwind_n_new_j / r_downwind_n_new_j)); 
+        r_downwind_n_i = r_downwind_n_old_i + r_downwind_n_new_i;
+        r_upwind_n_i = r_upwind_n_old_i + r_upwind_n_new_i;
+        r_downwind_n_j = r_downwind_n_old_j + r_downwind_n_new_j;
+        r_upwind_n_j = r_upwind_n_old_j + r_upwind_n_new_j;
 
+    # ENO parameter 
+        abs(r_downwind_n_i) <= abs(r_upwind_n_i) ? px[i, j, n + 1] = 1 : px[i, j, n + 1] = 0;
+        abs(r_downwind_n_j) <= abs(r_upwind_n_j) ? py[i, j, n + 1] = 1 : py[i, j, n + 1] = 0;
 
     # Second order solution
-        phi[i, j, n + 1] = ( phi[i, j, n] + c * phi[i - 1, j, n + 1] + c * phi[i, j - 1, n + 1] 
-                                        - 0.5 * ( sx[i, j, n] .* r_downwind_n_old_i + sx[i, j, n + 1] .* r_downwind_n_new_i ) 
-                                        - 0.5 * ( sy[i, j, n] .* r_downwind_n_old_j + sy[i, j, n + 1] .* r_downwind_n_new_j )) / ( 1 + 2*c );
-    
+        phi[i, j, n + 1] = ( phi[i, j, n] + c * phi[i - 1, j, n + 1] + d * phi[i, j - 1, n + 1] 
+                                        - 0.5 * ( px[i, j, n + 1] .* r_downwind_n_i + ( 1 - px[i, j, n + 1] ) .* r_upwind_n_i ) 
+                                        - 0.5 * ( py[i, j, n + 1] .* r_downwind_n_j + ( 1 - py[i, j, n + 1] ) .* r_upwind_n_j ) ) / ( 1 + c + d );
+        
     # Predictor for next time step
-        phi_predictor_n2[i, j, n] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i - 1, j, n] + c * phi_predictor_n2[i, j - 1, n]) / ( 1 + 2*c );
+        phi_predictor_n2[i, j, n + 1] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i - 1, j, n + 1] + d * phi_predictor_n2[i, j - 1, n + 1] ) / ( 1 + c + d );
 
     end
     end
@@ -141,13 +140,9 @@ println("Error L2 first order: ", sum(abs.(phi_first_order[:, :, end] - phi_exac
 println("Error L_inf firts order: ", norm(phi_first_order[:, :, end] - phi_exact.(X1, X2, Ntau * tau), Inf)* h^2)
 
 # Plot of the result at the final time together with the exact solution
-
-# trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact scheme solution")
-trace2 = contour(x = x1, y = x2, z = phi_exact.(X1, X2, Ntau * tau), name = "Exact solution", showscale=false, contours_coloring="lines", colorscale = "Black" , line_width=2)
-trace3 = contour(x = x1, y = x2, z = 0*phi[:, :, end], name = "Compact", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
-trace1 = contour(x = x1, y = x2, z = phi_first_order[:, :, end], name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=0.5)
-
-
+trace1 = contour(x = x1, y = x2, z = phi_exact.(X1, X2, Ntau * tau), name = "Exact solution", showscale=false, contours_coloring="lines", colorscale="Greys", line_width=2)
+trace2 = contour(x = x1, y = x2, z = phi[:, :, end], name = "Compact", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
+trace3 = contour(x = x1, y = x2, z = phi_first_order[:, :, end], name = "First-order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1, line_dash="dash")
 layout = Layout(title = "Linear advection equation", xaxis_title = "x1", yaxis_title = "x2", zaxis_title = "phi", colorbar = false)
 
 plot_phi = plot([trace1, trace2, trace3], layout)

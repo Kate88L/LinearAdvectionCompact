@@ -121,7 +121,8 @@ for n = 1:Ntau
     # Second order solution
         phi[i, j, n + 1] = ( phi[i, j, n] + c * phi[i - 1, j, n + 1] + d * phi[i, j - 1, n + 1] 
                                         - 0.5 * ( px[i, j, n + 1] .* r_downwind_n_i + ( 1 - px[i, j, n + 1] ) .* r_upwind_n_i ) 
-                                        - 0.5 * ( py[i, j, n + 1] .* r_downwind_n_j + ( 1 - py[i, j, n + 1] ) .* r_upwind_n_j ) ) / ( 1 + c + d );
+                                        - 0.5 * ( py[i, j, n + 1] .* r_downwind_n_j + ( 1 - py[i, j, n + 1] ) .* r_upwind_n_j )
+                                        + 0.5 * ( c + d ) * ( phi[i - 1, j - 1, n + 1] - phi[i - 1, j, n + 1] - phi[i, j - 1, n + 1] ) ) / ( 1 + c + d - 0.5 * ( c + d ) );
         
     # Predictor for next time step
         phi_predictor_n2[i, j, n + 1] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i - 1, j, n + 1] + d * phi_predictor_n2[i, j - 1, n + 1] ) / ( 1 + c + d );

@@ -8,7 +8,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 2;
 
 # Courant number
 c = 4;
@@ -60,8 +60,7 @@ phi_predictor[:, :, 1] = phi_0.(X1, X2);
 ghost_point_time = phi_exact.(X1, X2, -tau);
 
 # ENO parameters
-px = zeros(Nx + 1, Nx + 1, Ntau + 1); 
-py = zeros(Nx + 1, Nx + 1, Ntau + 1); 
+p = zeros(Nx + 1, Nx + 1, Ntau + 1); 
 eps = 1e-8;
 
 # Time Loop
@@ -97,32 +96,16 @@ for n = 1:Ntau
         phi_predictor[i, j, n + 1] = ( phi[i, j, n] + c * phi_predictor[i - 1, j, n + 1] + d * phi_predictor[i, j - 1, n + 1] ) / ( 1 + c + d );
 
     # Corrector
-        r_downwind_n_old_i = phi_predictor[i, j, n] - phi_predictor[i - 1, j, n + 1];
-        r_upwind_n_old_i = - phi[i - 1, j, n] + phi_old[i, j];
-
-        r_downwind_n_new_i = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j, n + 1];
-        r_upwind_n_new_i = phi[i - 1, j, n + 1] - phi[i, j, n];
-
-        r_downwind_n_old_j = phi_predictor[i, j, n] - phi_predictor[i, j - 1, n + 1];
-        r_upwind_n_old_j = - phi[i, j - 1, n] + phi_old[i, j];
-
-        r_downwind_n_new_j = - phi_predictor[i, j, n + 1] + phi_predictor_n2[i, j - 1, n + 1];
-        r_upwind_n_new_j = phi[i, j - 1, n + 1] - phi[i, j, n];
-
-        r_downwind_n_i = r_downwind_n_old_i + r_downwind_n_new_i;
-        r_upwind_n_i = r_upwind_n_old_i + r_upwind_n_new_i;
-        r_downwind_n_j = r_downwind_n_old_j + r_downwind_n_new_j;
-        r_upwind_n_j = r_upwind_n_old_j + r_upwind_n_new_j;
+        r_upwind_n = phi_old[i, j] + phi[i - 1, j, n + 1] + phi[i, j - 1, n + 1] -  phi[i - 1, j, n] - phi[i, j - 1, n] - phi_predictor[i, j, n + 1];
+        r_downwind_n = 2 * phi[i, j, n] - 2 * phi_predictor[i, j, n + 1] + 0.5 * phi_predictor_n2[i - 1, j, n + 1] + 0.5 * phi_predictor_n2[i, j - 1, n + 1] - 0.5 * phi[i - 1, j, n] - 0.5 * phi[i, j - 1, n];
 
     # ENO parameter 
-        abs(r_downwind_n_i) <= abs(r_upwind_n_i) ? px[i, j, n + 1] = 1 : px[i, j, n + 1] = 0;
-        abs(r_downwind_n_j) <= abs(r_upwind_n_j) ? py[i, j, n + 1] = 1 : py[i, j, n + 1] = 0;
+        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 1 : p[i, j, n + 1] = 0;
 
     # Second order solution
         phi[i, j, n + 1] = ( phi[i, j, n] + c * phi[i - 1, j, n + 1] + d * phi[i, j - 1, n + 1] 
-                                        - 0.5 * ( px[i, j, n + 1] .* r_downwind_n_i + ( 1 - px[i, j, n + 1] ) .* r_upwind_n_i ) 
-                                        - 0.5 * ( py[i, j, n + 1] .* r_downwind_n_j + ( 1 - py[i, j, n + 1] ) .* r_upwind_n_j )
-                                        + 0.5 * ( c + d ) * ( phi[i - 1, j - 1, n + 1] - phi[i - 1, j, n + 1] - phi[i, j - 1, n + 1] ) ) / ( 1 + c + d - 0.5 * ( c + d ) );
+                                        - 0.5 * ( p[i, j, n + 1] .* r_downwind_n + ( 1 - p[i, j, n + 1] ) .* r_upwind_n ) 
+                                        + 0.5 * ( c + d ) * ( phi[i - 1, j - 1, n + 1] - phi[i - 1, j, n + 1] - phi[i, j - 1, n + 1] ) ) / ( 1 + 0.5 * ( c + d ) );
         
     # Predictor for next time step
         phi_predictor_n2[i, j, n + 1] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i - 1, j, n + 1] + d * phi_predictor_n2[i, j - 1, n + 1] ) / ( 1 + c + d );
@@ -146,6 +129,6 @@ trace2 = contour(x = x1, y = x2, z = phi[:, :, end], name = "Compact", showscale
 trace3 = contour(x = x1, y = x2, z = phi_first_order[:, :, end], name = "First-order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1, line_dash="dash")
 layout = Layout(title = "Linear advection equation", xaxis_title = "x1", yaxis_title = "x2", zaxis_title = "phi", colorbar = false)
 
-plot_phi = plot([trace1, trace2, trace3], layout)
+plot_phi = plot([trace1, trace2], layout)
 
 # plot_error = plot(surface(x = x1, y = x2, z = abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))* h^2))

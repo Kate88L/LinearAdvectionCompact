@@ -28,7 +28,6 @@ U = [1.0, 1.0]
 # Time
 tau = c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
-Ntau = 1;
 
 # Initial condition
 phi_0(x1, x2) = cos.(x1) .* cos.(x2);

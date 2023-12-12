@@ -34,10 +34,10 @@ c = u * tau / h
 # Initial condition
 # phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = piecewiseConstant(x);
-# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 # phi_0(x) = cos(x);
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
-phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
+# phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);
@@ -107,9 +107,9 @@ for n = 1:Ntau
 
         # ENO parameter
         if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
-            s[i,n+1] = 1/3
+            s[i,n+1] = 0
         else
-            s[i,n+1] = 1/3
+            s[i,n+1] = 1
         end
 
         # Second order solution

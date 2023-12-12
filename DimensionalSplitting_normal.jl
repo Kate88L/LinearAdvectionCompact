@@ -14,10 +14,10 @@ level = 0;
 C = 1.5;
 
 # Grid settings
-x1L = -pi/2
-x1R = pi
-x2L = -pi/2
-x2R = pi
+x1L = -1
+x1R = 1
+x2L = -1
+x2R = 1
 Nx = 100 * 2^level
 h = (x1R - x1L) / Nx
 
@@ -27,7 +27,7 @@ U = [1.0, 1.0]
 # Time settings
 tau = C * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
-# Ntau = 1
+# Ntau = 1;
 
 c = zeros(Nx + 1, 1) .+ U[1] * tau / h;
 d = zeros(Nx + 1, 1) .+ U[2] * tau / h;
@@ -76,7 +76,7 @@ for n = 1:Ntau
     phi[1, :, n + 1] = phi_exact_x.(x1[1], x2, n * tau, (n-1)* tau);
     phi_predictor[1, :, n + 1] = phi_exact_x.(x1[1], x2, n * tau, (n-1)* tau);
     ghost_point_left = phi_exact_x.(x1[1]-h, x2, n * tau, (n-1)* tau);
-    ghost_point_right = phi_exact_x.(x1[end]+h, x2, (n-1) * tau, (n-2)* tau);
+    ghost_point_right = phi_exact.(x1[end] + h, x2, (n-1) * tau);
 
     # Space loop - X direction
     for  i = 2:1:Nx + 1
@@ -106,19 +106,20 @@ for n = 1:Ntau
         r_downwind_i = - phi_predictor[i, :, n + 1] + phi_right;
         r_upwind_i = phi[i, :, n] - phi[i - 1, :, n + 1];
 
-        r_upwind_i += r_upwind_i_minus;
-        r_downwind_i += r_downwind_i_minus;
+        r_upwind_i = r_upwind_i_minus + r_upwind_i;
+        r_downwind_i = r_downwind_i_minus + r_downwind_i;
 
         # ENO parameter
         abs.(r_downwind_i) <= abs.(r_upwind_i) ? sx[i, n + 1] = 1 : sx[i, n + 1] = 0;
 
         # Second order solution
-        phi[i, :, n + 1] = ( phi[i, :, n] + c[i] * phi[i - 1, :, n + 1] - 0.5 * sx[i, n + 1] * r_downwind_i - 0.5 * ( 1 - sx[i, n + 1] ) * r_upwind_i )  / ( 1 + c[i] );
+        phi[i, :, n + 1] = ( phi[i, :, n] + c[i] * ( phi[i - 1, :, n + 1] - 0.5 * sx[i, n + 1] .* r_downwind_i - 0.5 * ( 1 - sx[i, n + 1] ) .* r_upwind_i ) ) / ( 1 + c[i] );
 
     end
 
     phi[:, :, n] = phi[:, :, n + 1];
     phi_first_order[:, :, n] = phi_first_order[:, :, n + 1];
+    phi_predictor[:, :, n] = phi_predictor[:, :, n + 1];
 
     phi_first_order[:, 1, n + 1] = phi_exact.(x1, x2[1], n * tau);
     phi[:, 1, n + 1] = phi_exact.(x1, x2[1], n * tau);
@@ -155,14 +156,14 @@ for n = 1:Ntau
         r_downwind_j = - phi_predictor[:, j, n + 1] + phi_up;
         r_upwind_j = phi[:, j, n] - phi[:, j - 1, n + 1];
 
-        r_upwind_j += r_upwind_j_minus;
-        r_downwind_j += r_downwind_j_minus; 
+        r_upwind_j = r_upwind_j_minus + r_upwind_j;
+        r_downwind_j = r_downwind_j_minus + r_downwind_j; 
 
         # ENO parameter 
         abs.(r_downwind_j) <= abs.(r_upwind_j) ? sy[j, n + 1] = 1 : sy[j, n + 1] = 0;
 
         # Second order solution
-        phi[:, j, n + 1] = ( phi[:, j, n] + d[j] * phi[:, j - 1, n + 1] - 0.5 * sy[j, n + 1] * r_downwind_j - 0.5 * ( 1 - sy[j, n + 1] ) * r_upwind_j )  / ( 1 + d[j] );
+        phi[:, j, n + 1] = ( phi[:, j, n] + d[j] * ( phi[:, j - 1, n + 1] - 0.5 * sy[j, n + 1] .* r_downwind_j - 0.5 * ( 1 - sy[j, n + 1] ) .* r_upwind_j ) ) / ( 1 + d[j] );
 
     end
 end
@@ -183,5 +184,5 @@ layout = Layout(title = "Linear advection equation", xaxis_title = "x2", yaxis_t
 
 plot_phi = plot([trace1, trace2], layout)
 
-plot_error = plot(surface(x = x1, y = x2, z = abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))* h^2))
+# plot_error = plot(surface(x = x1, y = x2, z = abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))* h^2))
 

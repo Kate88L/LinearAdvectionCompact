@@ -10,7 +10,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 3;
 
 # Courant number
 C = 5
@@ -39,8 +39,8 @@ c = zeros(Nx+1,1) .+ u * tau / h
 # phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
 # phi_0(x) = piecewiseConstant(x);
-# phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
-phi_0(x) = cos(x);
+phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
+# phi_0(x) = cos(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution

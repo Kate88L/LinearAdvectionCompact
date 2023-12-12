@@ -10,10 +10,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 5;
+level = 3;
 
 # Courant number
-C = 1
+C = 5
 
 # Grid settings
 xL = - 1
@@ -34,10 +34,10 @@ c = u * tau / h
 # Initial condition
 # phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = piecewiseConstant(x);
-phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 # phi_0(x) = cos(x);
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
-# phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
+phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - u * t);

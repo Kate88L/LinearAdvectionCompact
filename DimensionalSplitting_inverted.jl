@@ -8,10 +8,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 1;
 
 # Courant number
-C = 1.5;
+C = 3;
 
 # Grid settings
 x1L = -1
@@ -106,9 +106,8 @@ for n = 1:Ntau
         abs.(r_downwind_n) <= abs.(r_upwind_n) ? px[i, n + 1] = 0 : px[i, n + 1] = 0;
 
         # Second order solution
-        phi[i, :, n + 1] = ( phi[i, :, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, :,  n] + c[i] * phi[i - 1, :, n + 1] 
-                                          - 0.5 * px[i, n + 1] .* r_upwind_n
-                                          - 0.5 * ( 1 - px[i, n + 1] ) .* r_downwind_n )  / ( 1 + c[i] + 0.5 / c[i] * (c[i] - c[i-1]) );
+        phi[i, :, n + 1] = ( phi[i, :, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, :, n] + c[i] * phi[i - 1, :, n + 1] 
+                                          - 0.5 * ( px[i, n + 1] .* r_upwind_n + ( 1 - px[i, n + 1] ) .* r_downwind_n  ) )  / ( 1 + c[i] + 0.5 / c[i] * (c[i] - c[i-1]) );
 
         # Predictor for next time step
         phi_predictor_n2[i, :, n + 1] = ( phi[i, :, n + 1] + c[i] * phi_predictor_n2[i - 1, :, n + 1] ) / ( 1 + c[i] );

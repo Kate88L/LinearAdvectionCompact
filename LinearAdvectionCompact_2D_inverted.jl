@@ -8,7 +8,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 0;
 
 # Courant number
 c = 5;
@@ -26,11 +26,11 @@ h = (x1R - x1L) / Nx
 U = [1.0, 1.0]
 
 # Time
-tau = c * h / maximum(abs.(U))
+tau = sqrt(2) * c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
 
 # Initial condition
-phi_0(x1, x2) = cos.(x1) .* cos.(x2);
+phi_0(x1, x2) = x1.^2 + x2.^2;
 
 # Exact solution
 phi_exact(x1, x2, t) = phi_0.(x1 - U[1] * t, x2 - U[2] * t);
@@ -91,26 +91,23 @@ for n = 1:Ntau
     for j = 2:1:Nx + 1
 
     # First order solution
-        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c * phi_first_order[i - 1, j, n + 1] + d * phi_first_order[i, j - 1, n + 1] ) / ( 1 + c + d );
+        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + sqrt(2) * c * phi_first_order[i - 1, j - 1, n + 1] ) / ( 1 + sqrt(2) * c);
         
     # Predictor
-        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + c * phi_predictor[i - 1, j, n + 1] + d * phi_predictor[i, j - 1, n + 1] ) / ( 1 + c + d );
+        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + sqrt(2) * c * phi_predictor[i - 1, j - 1, n + 1] ) / ( 1 + sqrt(2) * c);
 
     # Corrector
-        r_upwind_n =   phi_old[i, j] - phi[i, j, n] - 0.5 * phi[i - 1, j, n] - 0.5 * phi[i, j - 1, n] + 0.5 * phi_predictor[i - 1, j, n + 1] + 0.5 * phi_predictor[i, j - 1, n + 1];
-        r_downwind_n = phi_predictor[i, j, n] - phi_predictor[i, j, n + 1] - 0.5 * phi_predictor[i - 1, j, n + 1] - 0.5 * phi_predictor[i, j - 1, n + 1] + 0.5 * phi_predictor_n2[i - 1, j, n + 1] + 0.5 * phi_predictor_n2[i, j - 1, n + 1];
-
+        r_upwind_n = - phi_predictor[i, j, n + 1] + phi_old[i, j] + phi_predictor[i - 1, j, n + 1] + phi_predictor[i, j - 1, n + 1] - phi[i - 1, j, n] - phi[i, j - 1, n];
+        r_downwind_n = - 2 * phi_predictor[i, j, n + 1] + 2 * phi[i, j, n] - 0.5 * phi[i - 1, j, n] - 0.5 * phi[i, j - 1, n] + 0.5 * phi_predictor_n2[i - 1, j, n + 1] + 0.5 * phi_predictor_n2[i, j - 1, n + 1];
     # ENO parameter 
-        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 0 : p[i, j, n + 1] = 1;
+        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 1/2 : p[i, j, n + 1] = 1/2;
 
     # Second order solution
-        phi[i, j, n + 1] = ( phi[i, j, n] + c * phi[i - 1, j, n + 1] + d * phi[i, j - 1, n + 1] 
-                                          + 0.5 * ( c + d ) * ( phi[i - 1, j - 1, n + 1] - phi[i - 1, j, n + 1] - phi[i, j - 1, n + 1] )
-                                          - 0.5 * ( 0.5 * phi[i - 1, j, n + 1] + 0.5 * phi[i, j - 1, n + 1] + phi[i, j, n] - 0.5 * phi[i - 1, j, n] - 0.5 * phi[i, j - 1, n] )
-                                          - 0.5 * ( ( 1 - p[i, j, n + 1] ) .* r_downwind_n + p[i, j, n + 1] .* r_upwind_n ) ) / ( 0.5 + 0.5 * ( c + d ) );
+        phi[i, j, n + 1] = ( phi[i, j, n] + sqrt(2) * c * phi[i - 1, j - 1, n + 1] 
+                                          - 0.5 * ( ( 1 - p[i, j, n + 1] ) .* r_downwind_n + p[i, j, n + 1] .* r_upwind_n ) ) / ( 1 + sqrt(2) * c );
         
     # Predictor for next time step
-        phi_predictor_n2[i, j, n + 1] = ( phi[i, j, n + 1] + c * phi_predictor_n2[i - 1, j, n + 1] + d * phi_predictor_n2[i, j - 1, n + 1] ) / ( 1 + c + d );
+        phi_predictor_n2[i, j, n + 1] = ( phi[i, j, n + 1] + sqrt(2) * c * phi_predictor_n2[i - 1, j - 1, n + 1] ) / ( 1 + sqrt(2) * c );
 
     end
     end

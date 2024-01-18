@@ -8,10 +8,10 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 1;
 
 # Courant number
-c = 5;
+c = 15;
 d = c;
 
 # Grid settings - 2D regular grid
@@ -97,10 +97,11 @@ for n = 1:Ntau
         phi_predictor[i, j, n + 1] = ( phi[i, j, n] + sqrt(2) * c * phi_predictor[i - 1, j - 1, n + 1] ) / ( 1 + sqrt(2) * c);
 
     # Corrector
-        r_upwind_n = - phi_predictor[i, j, n + 1] + phi_old[i, j] + phi_predictor[i - 1, j, n + 1] + phi_predictor[i, j - 1, n + 1] - phi[i - 1, j, n] - phi[i, j - 1, n];
-        r_downwind_n = - 2 * phi_predictor[i, j, n + 1] + 2 * phi[i, j, n] - 0.5 * phi[i - 1, j, n] - 0.5 * phi[i, j - 1, n] + 0.5 * phi_predictor_n2[i - 1, j, n + 1] + 0.5 * phi_predictor_n2[i, j - 1, n + 1];
-    # ENO parameter 
-        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 1/2 : p[i, j, n + 1] = 1/2;
+        r_upwind_n = phi_old[i, j] - phi[i , j, n] + phi[i - 1, j - 1, n + 1] - phi[i - 1, j - 1, n];
+        r_downwind_n = phi_predictor[i, j, n] - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j - 1, n + 1] - phi_predictor[i - 1, j - 1, n + 1];
+   
+        # ENO parameter 
+        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 0 : p[i, j, n + 1] = 1;
 
     # Second order solution
         phi[i, j, n + 1] = ( phi[i, j, n] + sqrt(2) * c * phi[i - 1, j - 1, n + 1] 

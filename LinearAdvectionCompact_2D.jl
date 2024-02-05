@@ -30,7 +30,8 @@ tau = c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
 
 # Initial condition
-phi_0(x1, x2) = cos.(x1) .* cos.(x2);
+# phi_0(x1, x2) = cos.(x1) .* cos.(x2);
+phi_0(x1, x2) = x1.^2 + x2.^2;
 
 # Exact solution
 phi_exact(x1, x2, t) = phi_0.(x1 - U[1] * t, x2 - U[2] * t);

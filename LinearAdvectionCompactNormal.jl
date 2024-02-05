@@ -38,8 +38,8 @@ phi_exact(x, t) = cosVelocityNonSmooth(x, t);
 x = range(xL, xR, length = Nx + 1)
 
 # Time settings
-T = 2 * π
-Ntau = 10 * 2^level
+T = 0.2 * π
+Ntau = 100 * 2^level
 tau = T / Ntau
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h

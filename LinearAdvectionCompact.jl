@@ -11,10 +11,10 @@ include("ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 0;
 
 # Courant number
-C = 1.5;
+C = 0.5;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -42,7 +42,7 @@ T = 0.2 * π
 Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
-Ntau = 2
+# Ntau = 2
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
@@ -246,6 +246,12 @@ println("=============================")
 # df_08 = CSV.File("c_0.8.csv") |> DataFrame
 # phi_08 = Matrix(df_08)
 
+# Compute TVD property
+TVD = zeros(Ntau + 1)
+for n = 1:Ntau + 1
+    TVD[n] = sum(abs(phi[i, n] - phi[i - 1, n]) for i = 2:Nx + 1);
+end
+
 # Plot of the result at the final time together with the exact solution
 # trace1 = scatter(x = x, y = phi_8[:,end], mode = "lines", name = "Compact TVD C = 8", line=attr(color="firebrick", width=2))
 trace2 = scatter(x = x, y = phi_exact.(x, Ntau*tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
@@ -273,6 +279,11 @@ layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = 
 
 plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
 
-p = [plot_phi; plod_d_phi]
+# Plot TVD
+trace_tvd = scatter(x = range(0, Ntau * tau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
+plot_tvd = plot([trace_tvd], layout)
+
+
+p = [plot_phi; plod_d_phi; plot_tvd]
 relayout!(p, width = 1000, height = 500)
 p

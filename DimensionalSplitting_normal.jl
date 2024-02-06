@@ -8,7 +8,7 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 2;
 
 # Courant number
 C = 1.5;

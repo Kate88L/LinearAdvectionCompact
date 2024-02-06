@@ -6,37 +6,30 @@ using CSV
 using DataFrames
 
 include("InitialFunctions.jl")
+include("ExactSolutions.jl")
 
 ## Definition of basic parameters
 
 # Level of refinement
-level = 5;
+level = 0;
 
 # Courant number
-C = 4;
+# C = 4;
 
 # Grid settings
-xL = -1*pi/2 
-xR = 1*3*pi/2
+xL = - 1 * π / 2
+xR = 1 * 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-# u = 1
-# u(x) = sin(x) 
-u(x) = 2 + 3/2 * cos(x)
+u(x) = 1 + 3/4 * cos(x)
 
 # Initial condition
-# phi_0(x) = makePeriodic(allInOne,-1,1)(x);
-# phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
-# phi_0(x) = sin(x);
-phi_0(x) = cos(x);
+phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 
 # Exact solution
-# phi_exact(x, t) = phi_0(x - u * t);
-# phi_exact(x, t) = sin.(2 * atan.( tan.(x / 2) * exp.(-t) ));
-phi_exact(x, t) = cos.(2*atan.(sqrt(7).*tan((sqrt(7).*(t - (4*atan.(tan.(x/2)./sqrt(7)))./sqrt(7)))/4)))
-                
+phi_exact(x, t) = cosVelocityNonSmooth(x, t);              
 
 ## Comptutation
 
@@ -44,9 +37,9 @@ phi_exact(x, t) = cos.(2*atan.(sqrt(7).*tan((sqrt(7).*(t - (4*atan.(tan.(x/2)./s
 x = range(xL, xR, length = Nx + 1)
 
 # Time
-T = pi / sqrt(3)
+T = 0.2 * π
 # tau = C * h / u
-Ntau = 30 * 2^level
+Ntau = 100 * 2^level
 tau = T / Ntau
 # Ntau = 1
 
@@ -269,3 +262,16 @@ plot_phi = plot([ trace1, trace2, trace3], layout)
 plot_phi
 
 # CSV.write("c_1.6.csv", DataFrame(phi,:auto))
+
+# Plot of the numerical derivative of the solution and the exact solution at the final time
+trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
+trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
+trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
+
+layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
+
+plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
+
+p = [plot_phi; plod_d_phi]
+relayout!(p, width = 1000, height = 500)
+p

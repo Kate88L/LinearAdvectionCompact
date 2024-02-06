@@ -11,10 +11,10 @@ include("ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 1;
 
 # Courant number
-# C = 4;
+C = 1.5;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -41,7 +41,8 @@ T = 0.2 * π
 # tau = C * h / u
 Ntau = 100 * 2^level
 tau = T / Ntau
-# Ntau = 1
+tau = C * h / maximum(u.(x))
+Ntau = 2
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 

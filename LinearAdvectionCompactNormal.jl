@@ -11,10 +11,10 @@ include("ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 2;
 
 # Courant number
-C = 1
+C = 4.5
 
 # Grid settings
 xL = - 1 * π / 2
@@ -41,6 +41,8 @@ x = range(xL, xR, length = Nx + 1)
 T = 0.2 * π
 Ntau = 100 * 2^level
 tau = T / Ntau
+tau = C * h / maximum(u.(x))
+Ntau = 1
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
@@ -102,9 +104,9 @@ for n = 1:Ntau
 
         # ENO parameter
         if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
-            s[i,n+1] = 0
-        else
             s[i,n+1] = 1
+        else
+            s[i,n+1] = 0
         end
 
         # Second order solution

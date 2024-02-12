@@ -10,21 +10,21 @@ include("InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 0;
 
 # Courant number
-C = 5
+C = 1
 
 # Grid settings
-xL = -1
-xR = 1
+xL = -1 * π / 2
+xR = 1 * 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 x = range(xL, xR, length = Nx + 1)
 
 # Velocity
-u = 1.0
-# u(x) = 2 + cos.(x);
+# u = 1.0
+u(x) = 1;
 
 # Time settings
 T = 1
@@ -39,12 +39,12 @@ c = zeros(Nx+1,1) .+ u * tau / h
 # phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
 # phi_0(x) = piecewiseConstant(x);
-phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
-# phi_0(x) = cos(x);
+# phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
+phi_0(x) = cos(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
-phi_exact(x, t) = phi_0(x - u * t);
+phi_exact(x, t) = phi_0(x - t);
 # phi_exact(x, t) = cos(2*atan(sqrt(3)*tan((sqrt(3).*(t - (2*atan(tan(x/2.)./sqrt(3)))./sqrt(3)))/2.)))
 ## Comptutation
 

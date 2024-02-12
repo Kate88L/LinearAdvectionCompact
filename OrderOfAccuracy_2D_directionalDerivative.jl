@@ -111,6 +111,9 @@ uP_i_j_nm = ( u_i_j_nmm + c * sqrt(2) * u_im_jm_nm) / (1 + sqrt(2) * c);
 uP_im_j_np = ( u_im_j_n + cm * sqrt(2) * u_imm_jm_np ) / (1 + sqrt(2) * cm);
 uP_i_jm_np = ( u_i_jm_n + cm * u_im_jmm_np ) / (1 + sqrt(2) * cm);
 
+uP_im_j_n = ( u_im_j_nm + cm * sqrt(2) * u_imm_jm_n ) / (1 + sqrt(2) * cm);
+uP_i_jm_n = ( u_i_jm_nm + cm * u_im_jmm_n ) / (1 + sqrt(2) * cm);
+
 
 # Diagonal direction of the velocity a == b == C * sqrt(2) * h / tau
 a = c * sqrt(2) * h / tau;
@@ -121,8 +124,6 @@ f_inverted = (u_i_j_n - u_i_j_nm) + c * sqrt(2) * (u_i_j_n - u_im_jm_n)
 f_inverted = f_inverted + 1/2 * ( (1 - α) * ( u_i_j_np - 2 * u_i_j_n + u_i_j_nm ) + α * ( u_i_j_n - 2 * u_i_j_nm + u_i_j_nmm ) ) # remove DTT terms
 f_inverted = f_inverted - 1/2 * ( (1 - β) * ( u_i_j_np - u_i_j_n - u_im_j_np + u_im_j_n ) + β * ( u_i_j_n - u_i_j_nm - u_im_j_n + u_im_j_nm ) ) # remove DXT terms
 f_inverted = f_inverted - 1/2 * ( (1 - β) * ( u_i_j_np - u_i_j_n - u_i_jm_np + u_i_jm_n ) + β * ( u_i_j_n - u_i_j_nm - u_i_jm_n + u_i_jm_nm ) ) # remove DYT terms
-# f_inverted = f_inverted - 1/2 * ( (1 - α) * ( u_i_j_np - u_i_j_n - u_im_j_np + u_im_j_n ) + α * ( u_i_j_n - u_i_j_nm - u_im_j_n + u_im_j_nm ) ) # remove DXT terms
-# f_inverted = f_inverted - 1/2 * ( (1 - α) * ( u_i_j_np - u_i_j_n - u_i_jm_np + u_i_jm_n ) + α * ( u_i_j_n - u_i_j_nm - u_i_jm_n + u_i_jm_nm ) ) # remove DYT terms
 
 f_inverted = f_inverted.subs(DT, - a * DX - b * DY)
 
@@ -133,13 +134,22 @@ f_inverted = f_inverted.subs(DYY, -1/b * ( DYT + a * DXY ) )
 # Remove /beta  
 f_inverted = f_inverted.subs(β, 1/2 * (1 + α))
 
-
 simplified_f_inverted = cancel(expand(f_inverted))
 
-# Print the result in a readable format
-# println(simplify(simplified_f_normal))
-println(simplify(simplified_f_inverted))
-# println(simplify((simplified_f_inverted + simplified_f_normal)/2))
+# 1 predictor 1 corrector version
+f = (u_i_j_n - u_i_j_nm) + c * sqrt(2) * (u_i_j_n - u_im_jm_n)
+f = f + 1/2 * ( (1 - α) * ( -2 * uP_i_j_n + 2 * u_i_j_nm - 1/2 * u_im_j_nm - 1/2 * u_i_jm_nm + 1/2 * uP_im_j_np + 1/2 * uP_i_jm_np ) + 
+                      α * ( - uP_i_j_n + u_i_j_nmm + uP_im_j_n + uP_i_jm_n - u_im_j_nm - u_i_jm_nm ) ) 
 
-# equation = Eq(simplified_f_inverted/DTTT, 0);
-# solve(equation, s)
+f = f.subs(DT, - a * DX - b * DY)
+f = f.subs(DXX, -1/a * ( DXT + b * DXY ) )
+f = f.subs(DYY, -1/b * ( DYT + a * DXY ) )
+f_simplified = cancel(expand(f))
+
+# f = f.subs(α, 0)
+
+# Print the result in a readable format
+# println(simplify(simplified_f_inverted))
+
+print(simplify(f_simplified))
+

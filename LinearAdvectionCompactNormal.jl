@@ -11,10 +11,10 @@ include("ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 0;
 
 # Courant number
-C = 4.5
+C = 1/2
 
 # Grid settings
 xL = - 1 * π / 2
@@ -23,22 +23,22 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u(x) = 1 + 3/4 * cos(x)
-# u(x) = 1
+# u(x) = 1 + 3/4 * cos(x)
+u(x) = 1
 
 # Initial condition
-phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
-# phi_0(x) = cos.(x);
+# phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
+phi_0(x) = cos.(x);
 
 # Exact solution
-phi_exact(x, t) = cosVelocityNonSmooth(x, t);
-# phi_exact(x, t) = phi_0.(x - t);
+# phi_exact(x, t) = cosVelocityNonSmooth(x, t);
+phi_exact(x, t) = phi_0.(x - t);
 
 # Grid initialization
 x = range(xL, xR, length = Nx + 1)
 
 # Time settings
-T = 0.2 * π
+T = 2 * π
 Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
@@ -93,7 +93,7 @@ for n = 1:Ntau
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c[i] *  phi_first_order[i - 1, n + 1] ) / ( 1 + c[i] );
         
         # Predictor
-        phi_predictor[i, n + 1] = ( phi_predictor[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
+        phi_predictor[i, n + 1] = ( phi[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
 
         # Corrector
         r_downwind_i_minus = - phi_predictor[i, n] + phi_predictor[i - 1, n + 1];

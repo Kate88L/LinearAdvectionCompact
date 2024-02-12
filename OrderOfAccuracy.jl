@@ -83,12 +83,12 @@ simplified_f_normal = cancel(expand(f_normal))
 simplified_f_inverted = cancel(expand(f_inverted))
 
 # Print the result in a readable format
-# println(simplify(simplified_f_normal))
-println(simplify(simplified_f_inverted))
+println(simplify(simplified_f_normal))
+# println(simplify(simplified_f_inverted))
 # println(simplify((simplified_f_inverted + simplified_f_normal)/2))
 
 # equation = Eq(simplified_f_normal/DXXX, 0);
 # solve(equation, w)
 
-equation = Eq(simplified_f_inverted/DTTT, 0);
-solve(equation, s)
+# equation = Eq(simplified_f_inverted/DTTT, 0);
+# solve(equation, s)

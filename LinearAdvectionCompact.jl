@@ -14,7 +14,7 @@ include("ExactSolutions.jl")
 level = 0;
 
 # Courant number
-C = 0.5;
+C = 5;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -24,12 +24,16 @@ h = (xR - xL) / Nx
 
 # Velocity
 u(x) = 1 + 3/4 * cos(x)
+# u(x) = 1
 
 # Initial condition
 phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
+# phi_0(x) = cos.(x);
+# phi_0(x) = exp(-x.^2 *1000)
 
 # Exact solution
-phi_exact(x, t) = cosVelocityNonSmooth(x, t);              
+phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
+# phi_exact(x, t) = phi_0.(x - t);             
 
 ## Comptutation
 
@@ -95,12 +99,12 @@ for n = 1:Ntau
     end
 
     # Space loop
-    for i = 2:1:Nx
+    for i = 2:1:Nx + 1
 
-        if i < Nx
-            phi_right = phi[i + 2, n + 1];
+        if i < Nx + 1
+            phi_right = phi_predictor_i[i + 1, n]
         else
-            phi_right = ghost_point_right[n];
+            phi_right = phi_exact(xR + h, (n-1) * tau);
         end
 
         if i > 2
@@ -110,27 +114,24 @@ for n = 1:Ntau
         end
 
         # First order solution
-        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] 
-                                                            + abs(c[i]) * (c[i] < 0) * phi_first_order[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
+        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
         
         # Predictor
-        phi_predictor_i[i, n + 1] = ( phi_predictor_i[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] 
-                                                            + abs(c[i]) * (c[i] < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
-        phi_predictor_n[i, n + 1] =  ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1]
-                                                 + abs(c[i]) * (c[i] < 0) * phi_predictor_n[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
+        phi_predictor_i[i, n + 1] = ( phi_predictor_i[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+        phi_predictor_n[i, n + 1] =  ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         # Corrector
-        r_downwind_i_minus = - phi_predictor_i[i, n] + (c[i] > 0) * phi_predictor_i[i - 1, n + 1] + (c[i] < 0) * phi_predictor_i[i + 1, n + 1];
-        r_upwind_i_minus = - (c[i] > 0) * phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + (c[i] > 0) * phi_left + (c[i] < 0) * phi_right;
+        r_downwind_i_minus = - phi_predictor_i[i, n] + phi_predictor_i[i - 1, n + 1];
+        r_upwind_i_minus = -  phi[i - 1, n] + phi_left;
 
-        r_downwind_i = - phi_predictor_i[i, n + 1] + (c[i] > 0) * phi_predictor_i[i + 1, n] + (c[i] < 0) * phi_predictor_i[i - 1, n];
-        r_upwind_i = phi[i, n] - (c[i] > 0) * phi[i - 1, n + 1] - (c[i] < 0) * phi[i + 1, n + 1];
+        r_downwind_i = - phi_predictor_i[i, n + 1] + phi_right;
+        r_upwind_i = phi[i, n] - phi[i - 1, n + 1];
 
-        r_downwind_n_old = phi_predictor_n[i, n] - (c[i] > 0) * phi_predictor_n[i - 1, n + 1] - (c[i] < 0) * phi_predictor_n[i + 1, n + 1];
-        r_upwind_n_old = - (c[i] > 0) *  phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + phi_old[i];
+        r_downwind_n_old = phi_predictor_n[i, n] - phi_predictor_n[i - 1, n + 1];
+        r_upwind_n_old = - phi[i - 1, n] + phi_old[i];
 
-        r_downwind_n_new = - phi_predictor_n[i, n + 1] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] + (c[i] < 0) * phi_predictor_n2[i + 1, n + 1];
-        r_upwind_n_new = (c[i] > 0) * phi[i - 1, n + 1] + (c[i] < 0) * phi[i + 1, n + 1] - phi[i, n];
+        r_downwind_n_new = - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+        r_upwind_n_new = phi[i - 1, n + 1] - phi[i, n];
 
 
         # ENO parameters
@@ -145,78 +146,21 @@ for n = 1:Ntau
         else
             p[i,n+1] = 0
         end
+
+        A = 1;
+        if ( (r_downwind_n_new + r_downwind_n_old ) * (r_upwind_n_new + r_upwind_n_old ) < 0 ) 
+            A = 0;
+        end
+
         # Second order solution
-        phi[i, n + 1] = ( phi[i, n] +  max( 0, min( 1, abs(c[i]) - 1/2 ) ) * ( (c[i] > 0) * 0.5/(abs(c[i])+eps) * (c[i] - c[i-1]) * phi[i, n] + (c[i] < 0) * 0.5/(abs(c[i])+eps) * (c[i+1] - c[i]) * phi[i, n] ) 
-                                    + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] + abs(c[i]) * (c[i] < 0) * phi[i + 1, n + 1] 
+        phi[i, n + 1] = ( phi[i, n] +  max( 0, min( 1, abs(c[i]) - 1/2 ) ) * (  0.5/(abs(c[i])+eps) * (c[i] - c[i-1]) * phi[i, n] ) 
+                                    + abs(c[i]) * phi[i - 1, n + 1]
                                     - 0.5 * abs(c[i]) * min( 1, max( 0, 3/2 - abs(c[i]) ) ) * ( s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) + (1 - s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) 
-                                           - 0.5 * max( 0, min( 1, abs(c[i]) - 1/2 ) ) * ( p[i, n + 1] * (r_downwind_n_old + r_downwind_n_new) + (1 - p[i, n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) + max( 0, min( 1, abs(c[i]) - 1/2 ) ) * 0.5 / (abs(c[i])+eps) * ( (c[i]>0) * (c[i] - c[i-1]) + (c[i]<0) * (c[i+1]-c[i]) ) );
+                                           - 0.5 * max( 0, min( 1, abs(c[i]) - 1/2 ) ) * ( A * p[i, n + 1] * (r_downwind_n_old + r_downwind_n_new) + A * (1 - p[i, n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) + max( 0, min( 1, abs(c[i]) - 1/2 ) ) * 0.5 / (abs(c[i])+eps) * (c[i] - c[i-1]) );
 
 
         # Predictor for next time step
-        phi_predictor_n2[i, n + 1] =  ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] 
-                                                      + abs(c[i]) * (c[i] < 0) * phi_predictor_n2[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
-
-    end
-
-    for i = Nx:-1:2
-
-        if i < Nx
-            phi_right = phi[i + 2, n + 1];
-        else
-            phi_right = ghost_point_right[n];
-        end
-
-        if i > 2
-            phi_left = phi[i - 2, n + 1];
-        else
-            phi_left = ghost_point_left[n];
-        end
-
-        # First order solution
-        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] 
-                                                            + abs(c[i]) * (c[i] < 0) * phi_first_order[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
-        
-        # Predictor
-        phi_predictor_i[i, n + 1] = ( phi_predictor_i[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] 
-                                                          + abs(c[i]) * (c[i] < 0) * phi[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
-        phi_predictor_n[i, n + 1] =  ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1]
-                                                 + abs(c[i]) * (c[i] < 0) * phi_predictor_n[i + 1, n + 1]  ) / ( 1 + abs(c[i]) );
-
-        # Corrector
-        r_downwind_i_minus = - phi_predictor_i[i, n] + (c[i] > 0) * phi_predictor_i[i - 1, n + 1] + (c[i] < 0) * phi_predictor_i[i + 1, n + 1];
-        r_upwind_i_minus = - (c[i] > 0) * phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + (c[i] > 0) * phi_left + (c[i] < 0) * phi_right;
-
-        r_downwind_i = - phi_predictor_i[i, n + 1] + (c[i] > 0) * phi_predictor_i[i + 1, n] + (c[i] < 0) * phi_predictor_i[i - 1, n];
-        r_upwind_i = phi[i, n] - (c[i] > 0) * phi[i - 1, n + 1] - (c[i] < 0) * phi[i + 1, n + 1];
-
-        r_downwind_n_old = phi_predictor_n[i, n] - (c[i] > 0) * phi_predictor_n[i - 1, n + 1] - (c[i] < 0) * phi_predictor_n[i + 1, n + 1];
-        r_upwind_n_old = - (c[i] > 0) *  phi[i - 1, n] - (c[i] < 0) * phi[i + 1, n] + phi_old[i];
-
-        r_downwind_n_new = - phi_predictor_n[i, n + 1] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] + (c[i] < 0) * phi_predictor_n2[i + 1, n + 1];
-        r_upwind_n_new = (c[i] > 0) * phi[i - 1, n + 1] + (c[i] < 0) * phi[i + 1, n + 1] - phi[i, n];
-
-
-        # ENO parameters
-        if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
-            s[i,n+1] = 1
-        else
-            s[i,n+1] = 0
-        end
-        if abs(r_downwind_n_new + r_downwind_n_old) <= abs(r_upwind_n_new + r_upwind_n_old)
-            p[i,n+1] = 1
-        else
-            p[i,n+1] = 0
-        end
-        # Second order solution
-        phi[i, n + 1] = ( phi[i, n] +  max( 0, min( 1, abs(c[i]) - 1/2 ) ) * ( (c[i] > 0) * 0.5/(abs(c[i])+eps) * (c[i] - c[i-1]) * phi[i, n] + (c[i] < 0) * 0.5/(abs(c[i])+eps) * (c[i+1] - c[i]) * phi[i, n] ) 
-                                    + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] + abs(c[i]) * (c[i] < 0) * phi[i + 1, n + 1] 
-                                    - 0.5 * abs(c[i]) * min( 1, max( 0, 3/2 - abs(c[i]) ) ) * ( s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) + (1 - s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) 
-                                           - 0.5 * max( 0, min( 1, abs(c[i]) - 1/2 ) ) * ( p[i, n + 1] * (r_downwind_n_old + r_downwind_n_new) + (1 - p[i, n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) + max( 0, min( 1, abs(c[i]) - 1/2 ) ) * 0.5 / (abs(c[i])+eps) * ( (c[i]>0) * (c[i] - c[i-1]) + (c[i]<0) * (c[i+1]-c[i]) ) );
-
-
-        # Predictor for next time step
-        phi_predictor_n2[i, n + 1] =  ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] 
-                                                      + abs(c[i]) * (c[i] < 0) * phi_predictor_n2[i + 1, n + 1] ) / ( 1 + abs(c[i]) );
+        phi_predictor_n2[i, n + 1] =  ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
     end
 end
@@ -246,11 +190,31 @@ println("=============================")
 # df_08 = CSV.File("c_0.8.csv") |> DataFrame
 # phi_08 = Matrix(df_08)
 
-# Compute TVD property
+# Compute TVD property of the derivative
+phi_d = zeros(Nx + 1, Ntau + 1)
+phi_dd = zeros(Nx + 1, Ntau + 1)
 TVD = zeros(Ntau + 1)
 for n = 1:Ntau + 1
-    TVD[n] = sum(abs(phi[i, n] - phi[i - 1, n]) for i = 2:Nx + 1);
+    phi_d[:, n] = [ diff(phi[:, n]) / h ; ( phi[2, n] - phi[end, n] ) / h ];
+    phi_dd[:, n] = [ diff(phi_d[:, n]) / h ; ( phi_d[2, n] - phi_d[end, n] ) / h ]; 
+    TVD[n] = sum(abs.(phi_dd[:,n]));
 end
+
+phi_d = zeros(Nx + 1, Ntau + 1)
+phi_dd = zeros(Nx + 1
+, Ntau + 1)
+TVD_1 = zeros(Ntau + 1)
+for n = 1:Ntau + 1
+    phi_d[:, n] = [ diff(phi_first_order[:, n]) / h ; ( phi_first_order[2, n] - phi_first_order[end, n] ) / h ];
+    phi_dd[:, n] = [ diff(phi_d[:, n]) / h ; ( phi_d[2, n] - phi_d[end, n] ) / h ]; 
+    TVD_1[n] = sum(abs.(phi_dd[:,n]));
+end
+
+
+# TVD = zeros(Nx + 1)
+# for i = 1:Nx + 1
+#     TVD[i] = sum(abs(phi[i, n] - phi[i, n-1]) for n = 2:Ntau + 1);
+# end
 
 # Plot of the result at the final time together with the exact solution
 # trace1 = scatter(x = x, y = phi_8[:,end], mode = "lines", name = "Compact TVD C = 8", line=attr(color="firebrick", width=2))
@@ -280,10 +244,12 @@ layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = 
 plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
 
 # Plot TVD
-trace_tvd = scatter(x = range(0, Ntau * tau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
-plot_tvd = plot([trace_tvd], layout)
+trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
+trace_tvd_1 = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD_1, mode = "lines", name = "TVD first order", line=attr(color="royalblue", width=2))
+layout_tvd = Layout(title = "TVD")
+plot_tvd = plot([trace_tvd; trace_tvd_1], layout_tvd)
 
 
-p = [plot_phi; plod_d_phi; plot_tvd]
+p = [plot_phi; plod_d_phi]
 relayout!(p, width = 1000, height = 500)
 p

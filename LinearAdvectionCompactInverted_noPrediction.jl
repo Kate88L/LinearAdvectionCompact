@@ -9,13 +9,16 @@ include("ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 4;
 
 # Courant number
-C = 0.5;
+C = 8;
 
 # Level of correction
 p = 2;
+
+# Level of predictor accuracy
+pA = 2;
 
 # Grid settings
 xL = -0.5 #- 1 * π / 2
@@ -45,6 +48,7 @@ Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
+# Ntau = 3
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
@@ -68,6 +72,7 @@ ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
 ω = zeros(Nx + 1, Ntau + 1);
+ω0 = 1/3;
 ϵ = 1e-16;
 
 # Space loop
@@ -83,7 +88,7 @@ for i = 2:1:Nx+1
         end
 
         if n > Ntau - 1
-            phi_future = phi_exact.(x[i - 1], (n+2) * tau);
+            phi_future = phi_exact.(x[i - 1], (n+1) * tau);
         else
             phi_future = phi[i - 1, n + 2];
         end
@@ -91,12 +96,15 @@ for i = 2:1:Nx+1
         # First order solution
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c[i] * phi_first_order[i - 1, n + 1] ) / ( 1 + c[i] );
 
-        # Predictor - first order
-        phi_predictor[i, n + 1] = ( phi[i, n] + c[i] * phi_predictor[i - 1, n + 1] ) / ( 1 + c[i] );
-
-        # Predictor - second order
-        # phi_predictor[i, n + 1] = ( phi[i, n] + 0.5 / c[i] * ( c[i] - c[i-1] ) * phi[i, n] + c[i] * phi[i - 1, n + 1]
-        # - 0.5 * ( ( 1 ) * (phi[i, n] - phi[i - 1, n + 1] + phi_future) ) ) / ( 1 + c[i] + 0.5 / c[i] * (c[i] - c[i-1]) - (1) / 2 );
+        # Predictor 
+        if ( pA < 2 )
+            # Predictor - first order
+            phi_predictor[i, n + 1] = ( phi[i, n] + c[i] * phi_predictor[i - 1, n + 1] ) / ( 1 + c[i] );
+        else
+            # Predictor - second order
+            phi_predictor[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] 
+                                - 0.5 * ( ( 1 - ω0 ) * ( phi[i, n] - phi[i - 1, n + 1] + phi_future ) + ω0 * ( -phi[i - 1, n] + phi_old + phi[i - 1, n + 1] - phi[i, n] ) ) ) / ( 1 + c[i] - 0.5 * ( 1 - ω0 ) );
+        end
 
         # Corrector
         for j = 1:p
@@ -110,17 +118,30 @@ for i = 2:1:Nx+1
             r_downwind = phi[i, n] - phi[i - 1, n + 1] - phi_hat + phi_future;
             r_upwind = - phi[i - 1, n] + phi_old + phi[i - 1, n + 1] - phi[i, n];
 
-            # WENO parameter 
-            r = ( ϵ + r_upwind.^2 ) ./ ( ϵ + r_downwind.^2 );
-            ω[i, n] = 1 / ( 1 + 2 * r.^2 );
+            # WENO SHU
+            U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
+            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
+            ω[i, n] = U / ( U + D );
+            r = 1 - ω[i, n] + ω[i, n] * r_upwind / ( r_downwind + ϵ );
 
-            A = 1;
-            if ( (r_downwind) * (r_upwind) < 0 ) 
-                A = 0;
-            end
+            # if (abs(r_downwind) + ϵ) < (abs(r_upwind) + ϵ)
+            #     ω[i, n] = 0;
+            # else
+            #     ω[i, n] = 1;
+            # end
 
-            phi[i, n + 1] = ( phi[i, n] + 0.5 / c[i] * ( c[i] - c[i-1] ) * phi[i, n] + c[i] * phi[i - 1, n + 1]
-            - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * r_downwind) ) / ( 1 + c[i] + 0.5 / c[i] * (c[i] - c[i-1]) );
+            abs(r_upwind) < ϵ ? A = 0 : A = 1;
+            (r_downwind) * (r_upwind) < 0 ? A = 0 : A = 1;
+
+            # ENO version
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1]
+            # - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * r_downwind) ) / ( 1 + c[i] );
+
+            # WENO shu version
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * r * ( r_downwind + ϵ ) ) / ( 1 + c[i] );
+
+            # Compute the solution with no predictor
+            phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * ( phi[i, n] - phi[i - 1, n + 1] + phi_future ) ) ) / ( 1 + c[i] - 0.5 * A * (1 - ω[i, n]) );
         end
 
     end
@@ -155,12 +176,18 @@ plot_phi
 # Plot of the numerical derivative of the solution and the exact solution at the final time
 trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
 trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
-trace3_d = scatter(x = x, y = diff(phi_predictor[:, end]) / h, mode = "lines", name = "First order sol. gradient")
+trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
 
 layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
 
 plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
 
-p = [plot_phi; plod_d_phi]
+# Plot ω values in the last time step
+trace_ω = scatter(x = x, y = ω[:, end-1], mode = "lines", name = "ω", line=attr(color="firebrick", width=2))
+
+layout_ω = Layout(title = "Linear advection equation - WENO parameter", xaxis_title = "x", yaxis_title = "ω")
+plot_ω = plot([trace_ω], layout_ω)
+
+p = [plot_phi; plod_d_phi; plot_ω]
 relayout!(p, width = 1000, height = 500)
 p

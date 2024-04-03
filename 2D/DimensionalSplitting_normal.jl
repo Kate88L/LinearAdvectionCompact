@@ -3,7 +3,7 @@
 using LinearAlgebra
 using PlotlyJS
 
-include("Utils\\InitialFunctions.jl")
+include("../Utils/InitialFunctions.jl")
 
 ## Definition of basic parameters
 

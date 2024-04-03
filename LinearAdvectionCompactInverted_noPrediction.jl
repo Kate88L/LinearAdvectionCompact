@@ -2,6 +2,8 @@
 
 using LinearAlgebra
 using PlotlyJS
+using CSV
+using DataFrames
 
 include("InitialFunctions.jl")
 include("ExactSolutions.jl")
@@ -21,8 +23,8 @@ p = 2;
 pA = 2;
 
 # Grid settings
-xL = -0.5 #- 1 * π / 2
-xR = 2.5 #3 * π / 2
+xL = -0.5  #- 1 * π / 2
+xR = 2.5  #3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -33,6 +35,7 @@ u(x) = 1
 # Initial condition
 # phi_0(x) = cos(x);
 phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - t);
@@ -48,7 +51,7 @@ Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
-# Ntau = 3
+# Ntau = 1
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
@@ -73,6 +76,7 @@ ghost_point_time = phi_exact.(x, -tau);
 # WENO parameters
 ω = zeros(Nx + 1, Ntau + 1);
 ω0 = 1/3;
+ω0 = (C*(2*C+3)+1)/(6*C*(C+1));
 ϵ = 1e-16;
 
 # Space loop
@@ -122,7 +126,8 @@ for i = 2:1:Nx+1
             U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
             D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
             ω[i, n] = U / ( U + D );
-            r = 1 - ω[i, n] + ω[i, n] * r_upwind / ( r_downwind + ϵ );
+            r = ( r_upwind + ϵ ) / ( r_downwind + ϵ )
+            local s = 1 - ω[i, n] + ω[i, n] * r;
 
             # if (abs(r_downwind) + ϵ) < (abs(r_upwind) + ϵ)
             #     ω[i, n] = 0;
@@ -130,7 +135,7 @@ for i = 2:1:Nx+1
             #     ω[i, n] = 1;
             # end
 
-            abs(r_upwind) < ϵ ? A = 0 : A = 1;
+            # abs(r_upwind) < ϵ ? A = 0 : A = 1;
             (r_downwind) * (r_upwind) < 0 ? A = 0 : A = 1;
 
             # ENO version
@@ -138,15 +143,19 @@ for i = 2:1:Nx+1
             # - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * r_downwind) ) / ( 1 + c[i] );
 
             # WENO shu version
-            # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * r * ( r_downwind + ϵ ) ) / ( 1 + c[i] );
+            phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * s * ( r_downwind + ϵ ) ) / ( 1 + c[i] );
 
             # Compute the solution with no predictor
-            phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * ( phi[i, n] - phi[i - 1, n + 1] + phi_future ) ) ) / ( 1 + c[i] - 0.5 * A * (1 - ω[i, n]) );
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * ( phi[i, n] - phi[i - 1, n + 1] + phi_future ) ) ) / ( 1 + c[i] - 0.5 * A * (1 - ω[i, n]) );
         end
 
     end
 end
 
+CSV.write("phi.csv", DataFrame(phi, :auto))
+
+# df = CSV.File("phi_normal.csv") |> DataFrame
+# phi_1 = Matrix(df)
 
 # Print error
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
@@ -162,32 +171,31 @@ println("=============================")
 
 
 # Plot of the result at the final time together with the exact solution
-trace2 = scatter(x = x, y = phi_exact.(x, Ntau*tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
-trace1 = scatter(x = x, y = phi_0.(x), mode = "lines", name = "Initial Condition", line=attr(color="black", width=1, dash = "dash") )
-trace3 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", line=attr(color="firebrick", width=2))
+trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Inverted scheme", line=attr(color="firebrick", width=2))
+trace2 = scatter(x = x, y = phi_exact.(x, Ntau * tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
+# trace3 = scatter(x = x, y = phi_1[:, end], mode = "lines", name = "Classical scheme", line=attr(color="royalblue", width=2))
 
 
-layout = Layout(plot_bgcolor="white", 
-                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
-plot_phi = plot([ trace1, trace2, trace3], layout)
+layout = Layout(title = "Linear advection equation", xaxis_title = "x")
+plot_phi = plot([trace1, trace2], layout)
 
 plot_phi
 
 # Plot of the numerical derivative of the solution and the exact solution at the final time
-trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
+trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Inverted sol. gradient")
 trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
-trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
+# trace3_d = scatter(x = x, y = diff(phi_1[:, end]) / h, mode = "lines", name = "classical sol. gradient")
 
-layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
+layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x")
 
-plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
+plod_d_phi = plot([trace1_d, trace2_d], layout_d)
 
 # Plot ω values in the last time step
-trace_ω = scatter(x = x, y = ω[:, end-1], mode = "lines", name = "ω", line=attr(color="firebrick", width=2))
+# trace_ω = scatter(x = x, y = ω[:, end-1], mode = "lines", name = "ω", line=attr(color="firebrick", width=2))
 
-layout_ω = Layout(title = "Linear advection equation - WENO parameter", xaxis_title = "x", yaxis_title = "ω")
-plot_ω = plot([trace_ω], layout_ω)
+# layout_ω = Layout(title = "Linear advection equation - WENO parameter", xaxis_title = "x", yaxis_title = "ω")
+# plot_ω = plot([trace_ω], layout_ω)
 
-p = [plot_phi; plod_d_phi; plot_ω]
+p = [plot_phi; plod_d_phi]
 relayout!(p, width = 1000, height = 500)
 p

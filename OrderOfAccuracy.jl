@@ -54,13 +54,13 @@ f_normal = (u_i_n - u_i_nm) + c *(u_i_n - u_im_n) +
                    w * ( u_i_nm - u_im_nm - u_im_n + u_imm_n ) );
 
 f_inverted = (u_i_n - u_i_nm) + c * (u_i_n - u_im_n) + 
-    1 / 2 * ( (1 - s) * ( uP_im_np - uP_im_n - uP_i_n + uP_i_nm ) + 
+Sym(1) / 2 * ( (1 - s) * ( u_im_np - u_im_n - u_i_n + u_i_nm ) + 
                    s * ( u_im_n - u_im_nm - u_i_nm + u_i_nmm ) );
 
 f_normal = f_normal.subs(DT, - a * DX)
-f_inverted = f_inverted.subs(DX, - 1/a * DT)
+f_inverted = f_inverted.subs(DX, - Sym(1)/a * DT)
 f_normal = f_normal.subs(DTT, - a * DXT)
-f_inverted = f_inverted.subs(DXX, - 1/a * DXT)
+f_inverted = f_inverted.subs(DXX, - Sym(1)/a * DXT)
 f_inverted = f_inverted.subs(DTT, - a * DXT)
 
 # Courant number
@@ -83,8 +83,9 @@ simplified_f_normal = cancel(expand(f_normal))
 simplified_f_inverted = cancel(expand(f_inverted))
 
 # Print the result in a readable format
-println(simplify(simplified_f_normal))
-# println(simplify(simplified_f_inverted))
+# println(simplify(simplified_f_normal))
+simplified_f_inverted = simplified_f_inverted.subs(s, (c*(2*c+3)+1)/(6*c*(c+1)))
+println(simplify(simplified_f_inverted))
 # println(simplify((simplified_f_inverted + simplified_f_normal)/2))
 
 # equation = Eq(simplified_f_normal/DXXX, 0);

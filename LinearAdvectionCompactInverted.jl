@@ -13,11 +13,11 @@ include("InitialFunctions.jl")
 level = 0;
 
 # Courant number
-C = 1
+C = 10
 
 # Grid settings
-xL = -1 * π / 2
-xR = 1 * 3 * π / 2
+xL = -0.5 * π #- 1 * π / 2
+xR = 2.5 * π #3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 x = range(xL, xR, length = Nx + 1)
@@ -26,14 +26,18 @@ x = range(xL, xR, length = Nx + 1)
 # u = 1.0
 u(x) = 1;
 
-# Time settings
+# Time
+# T = 8 * π / sqrt(7)
 T = 1
 # tau = C * h / u
-Ntau = 10 * 2^level
+Ntau = 100 * 2^level
 tau = T / Ntau
+tau = C * h / maximum(u.(x))
+Ntau = Int(round(T / tau))
+Ntau = 1
 
 # c = u * tau / h
-c = zeros(Nx+1,1) .+ u * tau / h
+c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
 # Initial condition
 # phi_0(x) = piecewiseLinear(x);
@@ -111,7 +115,12 @@ for n = 1:Ntau
             s[i,n+1] = 1
         end
 
-        phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * ( (1-s[i,n + 1]) * (r_downwind_n_old + r_downwind_n_new) 
+        A = 1;
+        if ( (r_downwind_n_new + r_downwind_n_old ) * (r_upwind_n_new + r_upwind_n_old ) < 0 ) 
+            A = 0;
+        end
+
+        phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * A * ( (1-s[i,n + 1]) * (r_downwind_n_old + r_downwind_n_new) 
                                                                     + (s[i,n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
         
         
@@ -148,14 +157,14 @@ plot_phi = plot([trace1, trace2, trace3], layout)
 plot_phi
 
 # Plot of the numerical derivative of the solution and the exact solution at the final time
-# trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
-# trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
-# trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
+trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
+trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
+trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
 
-# layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
+layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
 
-# plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
+plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
 
-# p = [plot_phi; plod_d_phi]
-# relayout!(p, width = 1000, height = 500)
-# p
+p = [plot_phi; plod_d_phi]
+relayout!(p, width = 1000, height = 500)
+p

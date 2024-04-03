@@ -11,14 +11,14 @@ include("ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 3;
 
 # Courant number
-C = 5;
+C = 8;
 
 # Grid settings
 xL = - 1 * π / 2
-xR = 1 * 3 * π / 2
+xR = 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -29,7 +29,7 @@ u(x) = 1 + 3/4 * cos(x)
 # Initial condition
 phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = cos.(x);
-# phi_0(x) = exp(-x.^2 *1000)
+# phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
 phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
@@ -42,6 +42,7 @@ x = range(xL, xR, length = Nx + 1)
 
 # Time
 T = 8 * π / sqrt(7)
+# T = 1
 # tau = C * h / u
 Ntau = 100 * 2^level
 tau = T / Ntau
@@ -201,8 +202,7 @@ for n = 1:Ntau + 1
 end
 
 phi_d = zeros(Nx + 1, Ntau + 1)
-phi_dd = zeros(Nx + 1
-, Ntau + 1)
+phi_dd = zeros(Nx + 1, Ntau + 1)
 TVD_1 = zeros(Ntau + 1)
 for n = 1:Ntau + 1
     phi_d[:, n] = [ diff(phi_first_order[:, n]) / h ; ( phi_first_order[2, n] - phi_first_order[end, n] ) / h ];
@@ -210,11 +210,7 @@ for n = 1:Ntau + 1
     TVD_1[n] = sum(abs.(phi_dd[:,n]));
 end
 
-
-# TVD = zeros(Nx + 1)
-# for i = 1:Nx + 1
-#     TVD[i] = sum(abs(phi[i, n] - phi[i, n-1]) for n = 2:Ntau + 1);
-# end
+CSV.write("phi.csv", DataFrame(phi, :auto))
 
 # Plot of the result at the final time together with the exact solution
 # trace1 = scatter(x = x, y = phi_8[:,end], mode = "lines", name = "Compact TVD C = 8", line=attr(color="firebrick", width=2))
@@ -228,7 +224,7 @@ trace3 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", li
 layout = Layout(plot_bgcolor="white", 
                 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 # plot_phi = plot([ trace2, trace1,trace5, trace4, trace3], layout)
-plot_phi = plot([ trace1, trace2, trace3], layout)
+plot_phi = plot([ trace2, trace3], layout)
 
 plot_phi
 
@@ -241,13 +237,13 @@ trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines",
 
 layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")
 
-plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
+plod_d_phi = plot([trace1_d, trace2_d], layout_d)
 
 # Plot TVD
 trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
 trace_tvd_1 = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD_1, mode = "lines", name = "TVD first order", line=attr(color="royalblue", width=2))
 layout_tvd = Layout(title = "TVD")
-plot_tvd = plot([trace_tvd; trace_tvd_1], layout_tvd)
+plot_tvd = plot([trace_tvd], layout_tvd)
 
 
 p = [plot_phi; plod_d_phi]

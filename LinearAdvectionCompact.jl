@@ -11,10 +11,10 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 0;
 
 # Courant number
-C = 8;
+C = 1;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -23,17 +23,17 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u(x) = 1 + 3/4 * cos(x)
-# u(x) = 1
+# u(x) = 1 + 3/4 * cos(x)
+u(x) = 1
 
 # Initial condition
-phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
-# phi_0(x) = cos.(x);
+# phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
+phi_0(x) = cos.(x);
 # phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
-phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
-# phi_exact(x, t) = phi_0.(x - t);             
+# phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
+phi_exact(x, t) = phi_0.(x - t);             
 
 ## Comptutation
 

@@ -34,6 +34,7 @@ T = 8 * π / sqrt(7)
 
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
+Ntau = 2
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
@@ -42,14 +43,29 @@ phi = zeros(Nx + 1, Ntau + 1)
 phi_hat = zeros(Nx + 1, Ntau + 2)
 f_hat = zeros(Nx + 1, Ntau + 2)
 
+phi_predictor = zeros(Nx + 1, Ntau + 2); # predictor in time n+1
+phi_predictor_n2 = zeros(Nx + 1, Ntau + 2); # predictor in time n+2
+
 A = zeros(Nx + 1, Nx + 1)
 b = zeros(Nx + 1) # right-hand side
 
 # Initial condition
 phi[:,1] = phi_0.(x)
+phi_hat[:,1] = phi_0.(x)
+phi_predictor[:, 1] = phi_0.(x);
+phi_predictor_n2[:, 1] = phi_0.(x);
 
 # Boundary conditions
 phi[1,:] = phi_exact.(xL, tau*(0:Ntau))
+phi_hat[1,:] = phi_exact.(xL, tau*(0:Ntau+1))
+phi_predictor[1,:] = phi_exact.(xL, tau*(0:Ntau+1))
+phi_predictor_n2[1,:] = phi_exact.(xL, tau*(0:Ntau+1))
+
+# ENO parameters
+s = zeros(Nx + 1, Ntau + 1) .+ 1/3;
+
+# Ghost point on the time -1
+ghost_point_time = phi_exact.(x, -tau);
 
 ## Computation
 ω = zeros(Nx + 1) .+ 1/3
@@ -59,37 +75,32 @@ phi[1,:] = phi_exact.(xL, tau*(0:Ntau))
 # Time loop
 for n = 1:Ntau
 
-    # [1] Predict phi_hat in time n + 1 -------------------
-    global A, b
-    # Inflow boundary condition
-    A[1,1] = 1
-
-    b[1] = phi_exact(xL, tau*n) 
-
-    # Interior points
-    for i = 2:Nx+1
-        # second order
-        if (order_x == 2)
-            try A[i, i - 2] = c[i] * ω[i] / 2 catch end
-            A[i, i - 1] = - c[i] + c[i] * (1 - ω[i]) / 2 - c[i] * ω[i] 
-            A[i, i] = 1 + c[i] - c[i] * (1 - ω[i]) + c[i] * ω[i] / 2 
-            try  A[i, i + 1] = c[i] * (1 - ω[i]) / 2 catch end
+    # [1] [2] Predict phi_hat in time n + 1  and n + 2 -------------------
+    for j = 0:1
+        if n > 1 && n < 2
+            phi_old = phi_hat[:, n-1+j];
+        else
+            phi_old = ghost_point_time;
         end
-        # first order
-        if (order_x == 1)
-            A[i, i - 1] = -c[i]
-            A[i, i] = 1 + c[i]
+
+        for i = 2:Nx + 1
+            # Predictor
+            phi_predictor[i, n + 1 + j] = ( phi_hat[i, n + j] + abs(c[i]) * (c[i] > 0) * phi_predictor[i - 1, n + 1 + j] ) / ( 1 + abs(c[i]) );
+
+            # Corrector
+            r_downwind_n_old = phi_predictor[i, n + j] - (c[i] > 0) * phi_predictor[i - 1, n + 1 + j];
+            r_upwind_n_old = - (c[i] > 0) *  phi_hat[i - 1, n + j] + phi_old[i];
+
+            r_downwind_n_new = - phi_predictor[i, n + 1 + j] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1 + j];
+            r_upwind_n_new = (c[i] > 0) * phi_hat[i - 1, n + 1 + j] - phi_hat[i, n + j];
+
+            phi_hat[i, n + 1 + j] = ( phi_hat[i, n + j] + abs(c[i]) * (c[i] > 0) * phi_hat[i - 1, n + 1 + j] - 0.5 * ( (1-s[i,n + 1]) * (r_downwind_n_old + r_downwind_n_new) 
+            + (s[i,n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) );
+
+            # Predictor for next time step
+            phi_predictor_n2[i, n + 1 + j] = ( phi_hat[i, n + 1 + j] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1 + j] ) / ( 1 + abs(c[i]) );
         end
-        b[i] = phi[i, n]
     end
-
-    # Solve the system
-    phi_hat[:, n + 1] = A \ b
-
-    # [2] Compute the prediction in time n + 2 ------------------------------------
-    b = phi_hat[:, n + 1]
-    b[1] = phi_exact(xL, tau*(n+1))  
-    phi_hat[:, n + 2] = A \ b
 
     # [3] Compute the fluxes in time n + 2 ----------------------------------------
     if (order_x == 2 )
@@ -116,7 +127,9 @@ for n = 1:Ntau
     end
 
     # [4] Compute the final solution using the proposed formula -------------------
+    global A, b
     b[1] = phi_exact(xL, tau*n) 
+    A[1,1] = 1
 
     # Interior points
     for i = 2:Nx + 1

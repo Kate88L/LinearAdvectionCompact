@@ -52,30 +52,28 @@ phi[:,1] = phi_0.(x)
 phi[1,:] = phi_exact.(xL, tau*(0:Ntau))
 
 ## Computation
-ω = 1
+ω = zeros(Nx + 1) .+ 1/3
+ω[2] = 0
+ω[Nx+1] = 1
 
 # Time loop
 for n = 1:Ntau
 
     # [1] Predict phi_hat in time n + 1 -------------------
     global A, b
-    # Boundary conditions
+    # Inflow boundary condition
     A[1,1] = 1
-    A[2,2] = 1
-    A[Nx + 1, Nx + 1] = 1
 
     b[1] = phi_exact(xL, tau*n)
-    b[2] = phi_exact(xL + h, tau*n)   
-    b[Nx + 1] = phi_exact(xR, tau*n)
 
     # Interior points
-    for i = 3:Nx
+    for i = 2:Nx+1
         # second order
         if (order_x == 2)
-            A[i, i - 2] = c[i] * ω / 2
-            A[i, i - 1] =  c[i] * 0.5 * (1 - ω) - c[i] * ω - c[i]
-            A[i, i] = 1 - c[i] * (1 - ω) + c[i] * ω / 2 + c[i]
-            A[i, i + 1] = c[i] * 0.5 * (1 - ω)
+            try A[i, i - 2] = c[i] * ω[i] / 2 catch end
+            A[i, i - 1] = - c[i] + c[i] * (1 - ω[i]) / 2 - c[i] * ω[i] 
+            A[i, i] = 1 + c[i] - c[i] * (1 - ω[i]) + c[i] * ω[i] / 2 
+            try  A[i, i + 1] = c[i] * (1 - ω[i]) / 2 catch end
         end
         # first order
         if (order_x == 1)
@@ -91,39 +89,43 @@ for n = 1:Ntau
     # [2] Compute the prediction in time n + 2 ------------------------------------
     b = phi_hat[:, n + 1]
     b[1] = phi_exact(xL, tau*(n+1))
-    b[2] = phi_exact(xL + h, tau*(n+1))   
-    b[Nx + 1] = phi_exact(xR, tau*(n+1))
     phi_hat[:, n + 2] = A \ b
 
     # [3] Compute the fluxes in time n + 2 ----------------------------------------
-    if (order_x == 2)
+    if (order_x == 2 )
         f_hat[1, n + 2] = c[1] * (phi_hat[2, n + 2] - phi_hat[1, n + 2]) / tau
-        f_hat[2, n + 2] = c[2] * (phi_hat[3, n + 2] - phi_hat[2, n + 2]) / tau
-        for i = 3:Nx+1
-            f_hat[i, n + 2] = c[i] * (phi_hat[i, n + 2] - phi_hat[i - 1, n + 2]) / tau +  c[i] * 0.5 * (phi_hat[i, n + 2] - 2 * phi_hat[i - 1, n + 2] + phi_hat[i - 2, n + 2]) / tau
+        for i = 2:Nx+1
+            if (i == Nx + 1)
+                f_hat[i, n + 2] = c[i] * (phi_hat[i, n + 2] - phi_hat[i - 1, n + 2]) / tau +
+                c[i] * 0.5 * ω[i] * (phi_hat[i, n + 2] - 2 * phi_hat[i - 1, n + 2] + phi_hat[i - 2, n + 2]) / tau
+            elseif ( i == 2)
+                f_hat[i, n + 2] = c[i] * (phi_hat[i, n + 2] - phi_hat[i - 1, n + 2]) / tau +
+                c[i] * 0.5 * (1 - ω[i]) * (phi_hat[i + 1, n + 2] - 2 * phi_hat[i, n + 2] + phi_hat[i - 1, n + 2]) / tau 
+            else 
+                f_hat[i, n + 2] = c[i] * (phi_hat[i, n + 2] - phi_hat[i - 1, n + 2]) / tau +
+                c[i] * 0.5 * (1 - ω[i]) * (phi_hat[i + 1, n + 2] - 2 * phi_hat[i, n + 2] + phi_hat[i - 1, n + 2]) / tau +
+                c[i] * 0.5 * ω[i] * (phi_hat[i, n + 2] - 2 * phi_hat[i - 1, n + 2] + phi_hat[i - 2, n + 2]) / tau
+            end
         end
     end
     if (order_x == 1)
         f_hat[1, n + 2] = c[1] * (phi_hat[2, n + 2] - phi_hat[1, n + 2]) / tau
-        f_hat[2, n + 2] = c[2] * (phi_hat[3, n + 2] - phi_hat[2, n + 2]) / tau
-        for i = 3:Nx+1
+        for i = 2:Nx+1
             f_hat[i, n + 2] = c[i] * (phi_hat[i, n + 2] - phi_hat[i - 1, n + 2]) / tau
         end
     end
 
     # [4] Compute the final solution using the proposed formula -------------------
     b[1] = phi_exact(xL, tau*n) 
-    b[2] = phi_exact(xL + h, tau*n) 
-    b[Nx + 1] = phi_exact(xR, tau*n) 
 
     # Interior points
-    for i = 3:Nx
+    for i = 2:Nx + 1
         # second order
         if (order_x == 2)
-            A[i, i - 2] = 3/2*(c[i] * ω / 2)
-            A[i, i - 1] =  3/2 * (c[i] * 0.5 * (1 - ω) - c[i] * ω - c[i])
-            A[i, i] = 1 + 3/2*(-c[i] * (1 - ω) + c[i] * ω / 2 + c[i])
-            A[i, i + 1] = 3/2*(c[i] * 0.5 * (1 - ω))
+            try A[i, i - 2] = 3/2 * c[i] * ω[i] / 2 catch end
+            A[i, i - 1] = 3/2* ( - c[i] + c[i] * (1 - ω[i]) / 2 - c[i] * ω[i] )
+            A[i, i] = 1 + 3/2* ( c[i] - c[i] * (1 - ω[i]) + c[i] * ω[i] / 2 )
+            try A[i, i + 1] = 3/2 * c[i] * (1 - ω[i]) / 2 catch end
         end
         # first order
         if (order_x == 1)

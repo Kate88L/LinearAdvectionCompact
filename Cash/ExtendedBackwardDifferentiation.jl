@@ -142,6 +142,8 @@ end
 end
 
 ## Error computation
+Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
+println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
 

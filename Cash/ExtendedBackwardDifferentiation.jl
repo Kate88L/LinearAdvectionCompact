@@ -5,6 +5,7 @@ using PlotlyJS
 
 include("../Utils/InitialFunctions.jl")
 include("../Utils/ExactSolutions.jl")
+include("../Utils/Solvers.jl")
 
 @time begin
 ## Level of refinement
@@ -13,7 +14,7 @@ level = 3
 order_x = 2
 
 ## Courant number
-C = 1
+C = 8
 
 ## Model
 u(x) = 1 # velocity
@@ -84,12 +85,14 @@ for n = 1:Ntau
     end
 
     # Solve the system
-    phi_hat[:, n + 1] = A \ b
+    # phi_hat[:, n + 1] = A \ b
+    phi_hat[:, n + 1] = modifiedThomasAlgorithm(A, b)
 
     # [2] Compute the prediction in time n + 2 ------------------------------------
     b = phi_hat[:, n + 1]
     b[1] = phi_exact(xL, tau*(n+1))  
-    phi_hat[:, n + 2] = A \ b
+    # phi_hat[:, n + 2] = A \ b
+    phi_hat[:, n + 2] = modifiedThomasAlgorithm(A, b)
 
     # [3] Compute the fluxes in time n + 2 ----------------------------------------
     if (order_x == 2 )
@@ -136,7 +139,8 @@ for n = 1:Ntau
     end
 
     # Solve the system
-    phi[:, n + 1] = A \ b
+    # phi[:, n + 1] = A \ b
+    phi[:, n + 1] = modifiedThomasAlgorithm(A, b)
 
 end
 end

@@ -34,7 +34,6 @@ T = 8 * π / sqrt(7)
 
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
-# Ntau = 2
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 

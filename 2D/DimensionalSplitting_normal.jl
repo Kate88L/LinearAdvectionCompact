@@ -8,33 +8,34 @@ include("../Utils/InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 0;
 
 # Courant number
-C = 1.5;
+C = 5;
 
 # Grid settings
 x1L = -1
-x1R = 1
+x1R = 2
 x2L = -1
-x2R = 1
+x2R = 2
 Nx = 100 * 2^level
 h = (x1R - x1L) / Nx
 
 # Velocity
-U = [1.0, 1.0]
+U = [1.0, 0.0]
 
 # Time settings
 tau = C * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
-# Ntau = 1;
+Ntau = 1;
 
 c = zeros(Nx + 1, 1) .+ U[1] * tau / h;
 d = zeros(Nx + 1, 1) .+ U[2] * tau / h;
 
 # Initial condition
 # phi_0(x1, x2) = cos.(x1) .* cos.(x2);
-phi_0(x1, x2) = x1.^2 + x2.^2;
+# phi_0(x1, x2) = x1.^2 + x2.^2;
+phi_0(x1, x2) = exp.(-10 * (x1.^2 + x2.^2));
 
 # Exact solution
 phi_exact(x1, x2, t) = phi_0.(x1 - U[1] * t, x2 - U[2] * t);
@@ -117,6 +118,8 @@ for n = 1:Ntau
 
     end
 
+    continue;
+
     phi[:, :, n] = phi[:, :, n + 1];
     phi_first_order[:, :, n] = phi_first_order[:, :, n + 1];
     phi_predictor[:, :, n] = phi_predictor[:, :, n + 1];
@@ -182,7 +185,7 @@ trace2 = contour(x = x1, y = x2, z = phi[:, :, end], name = "Compact", showscale
 trace3 = contour(x = x1, y = x2, z = phi_first_order[:, :, end], name = "First order", showscale=false, colorscale = "Viridis", contours_coloring="lines", line_width=1)
 layout = Layout(title = "Linear advection equation", xaxis_title = "x2", yaxis_title = "x1", zaxis_title = "phi", colorbar = false)
 
-plot_phi = plot([trace1, trace2], layout)
+plot_phi = plot([trace1, trace3], layout)
 
 # plot_error = plot(surface(x = x1, y = x2, z = abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))* h^2))
 

@@ -8,7 +8,7 @@ include("../Utils/InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 1;
 
 # Courant number
 c = 1.5;
@@ -60,8 +60,8 @@ phi_predictor[:, :, 1] = phi_0.(X1, X2);
 ghost_point_time = phi_exact.(X1, X2, -tau);
 
 # ENO parameters
-sx = 0.5; 
-sy = 0.5; 
+sx = zeros(Nx + 1, Ntau + 1); 
+sy = zeros(Nx + 1, Ntau + 1); 
 eps = 1e-8;
 
 # Time Loop
@@ -135,12 +135,12 @@ for n = 1:Ntau
         r_downwind_j += r_downwind_j_minus; 
 
     # ENO parameter 
-        abs(r_downwind_i) <= abs(r_upwind_i) ? sx[i, j, n + 1] = 1 : sx[i, j, n + 1] = 0;
-        abs(r_downwind_j) <= abs(r_upwind_j) ? sy[i, j, n + 1] = 1 : sy[i, j, n + 1] = 0;
+        abs(r_downwind_i) <= abs(r_upwind_i) ? sx[i, n + 1] = 1 : sx[i, n + 1] = 0;
+        abs(r_downwind_j) <= abs(r_upwind_j) ? sy[i, n + 1] = 1 : sy[i, n + 1] = 0;
 
     # Second order solution
-        phi[i, j, n + 1] = ( phi[i, j, n] + c * ( phi[i - 1, j, n + 1] - 0.5 * sx[i , j, n + 1] .* r_downwind_i - 0.5 * ( 1 - sx[i, j, n + 1] ) .* r_upwind_i ) + 
-                                            d * ( phi[i, j - 1, n + 1] - 0.5 * sy[i, j, n + 1] .* r_downwind_j - 0.5 * ( 1 - sy[i, j, n + 1] ) .* r_upwind_j ) ) / ( 1 + c + d );
+        phi[i, j, n + 1] = ( phi[i, j, n] + c * ( phi[i - 1, j, n + 1] - 0.5 * sx[i, n + 1] .* r_downwind_i - 0.5 * ( 1 - sx[i, n + 1] ) .* r_upwind_i ) + 
+                                            d * ( phi[i, j - 1, n + 1] - 0.5 * sy[j, n + 1] .* r_downwind_j - 0.5 * ( 1 - sy[j, n + 1] ) .* r_upwind_j ) ) / ( 1 + c + d );
 
     end
     end

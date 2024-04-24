@@ -11,10 +11,10 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 5;
 
 # Courant number
-C = 1;
+C = 3;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -23,8 +23,9 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-# u(x) = 1 + 3/4 * cos(x)
-u(x) = 1
+u(x) = 1 + 3/4 * cos(x)
+u(x) = 2 + 3/2 * cos(x)
+# u(x) = 1
 
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
@@ -33,7 +34,8 @@ phi_0(x) = cos.(x);
 
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
-phi_exact(x, t) = phi_0.(x - t);             
+phi_exact(x, t) = cosVelocitySmooth(x, t);
+# phi_exact(x, t) = phi_0.(x - t);             
 
 ## Comptutation
 
@@ -42,7 +44,7 @@ x = range(xL, xR, length = Nx + 1)
 
 # Time
 T = 8 * π / sqrt(7)
-# T = 1
+T = π / sqrt(3)
 # tau = C * h / u
 Ntau = 100 * 2^level
 tau = T / Ntau
@@ -159,6 +161,13 @@ for n = 1:Ntau
                                     - 0.5 * abs(c[i]) * min( 1, max( 0, 3/2 - abs(c[i]) ) ) * ( s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) + (1 - s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) 
                                            - 0.5 * max( 0, min( 1, abs(c[i]) - 1/2 ) ) * ( A * p[i, n + 1] * (r_downwind_n_old + r_downwind_n_new) + A * (1 - p[i, n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) + max( 0, min( 1, abs(c[i]) - 1/2 ) ) * 0.5 / (abs(c[i])+eps) * (c[i] - c[i-1]) );
 
+        c_hat = minimum([c[i], 1 / 2]);
+        d = maximum([0, c[i] - c_hat]);
+
+        # phi[i, n + 1] = ( phi[i, n] +  d * (  0.5/(abs(c[i])+eps) * (c[i] - c[i-1]) * phi[i, n] ) 
+        #                             + abs(c[i]) * phi[i - 1, n + 1]
+        #                             - 0.5 * (c_hat) * ( s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) + (1 - s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) 
+        #                                    - 0.5 * d / (c_hat + d) * ( A * p[i, n + 1] * (r_downwind_n_old + r_downwind_n_new) + A * (1 - p[i, n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) + d * 0.5 / (abs(c[i])+eps) * (c[i] - c[i-1]) );
 
         # Predictor for next time step
         phi_predictor_n2[i, n + 1] =  ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );

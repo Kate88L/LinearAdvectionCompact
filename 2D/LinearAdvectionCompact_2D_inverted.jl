@@ -11,7 +11,7 @@ include("../Utils/InitialFunctions.jl")
 level = 1;
 
 # Courant number
-c = 15;
+c = 3;
 d = c;
 
 # Grid settings - 2D regular grid
@@ -28,6 +28,7 @@ U = [1.0, 1.0]
 # Time
 tau = sqrt(2) * c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
+
 
 # Initial condition
 phi_0(x1, x2) = x1.^2 + x2.^2;

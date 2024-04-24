@@ -8,7 +8,7 @@ include("../Utils/InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 2;
 
 # Courant number
 c = 5;
@@ -23,7 +23,7 @@ Nx = 100 * 2^level
 h = (x1R - x1L) / Nx
 
 # Velocity
-angle = 45 / 2 # angle in degrees
+angle = 45 / 5 # angle in degrees
 U = [cosd(angle), sind(angle)]
 
 # Time

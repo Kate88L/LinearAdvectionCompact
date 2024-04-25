@@ -14,11 +14,11 @@ include("Utils/ExactSolutions.jl")
 level = 3;
 
 # Courant number
-C = 8
+C = 6
 
 # Grid settings
-xL = - 1 * π / 2
-xR = 3 * π / 2
+xL =   - 1 * π / 2
+xR =  3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -73,9 +73,11 @@ phi_predictor[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 
 # Ghost point on the left side 
 ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau + 1));
 
-# ENO parameters
-s = zeros(Nx + 1, Ntau + 1);
-eps = 1e-8;
+# WENO parameters
+ϵ = 1e-8;
+ω0 = 1/3;
+
+l = zeros(Nx + 1)
 
 # Time loop
 for n = 1:Ntau
@@ -101,21 +103,29 @@ for n = 1:Ntau
         phi_predictor[i, n + 1] = ( phi[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
 
         # Corrector
-        r_downwind_i_minus = - phi_predictor[i, n] + phi_predictor[i - 1, n + 1];
-        r_upwind_i_minus = - phi[i - 1, n] + phi_left;
+        r_downwind_i = - phi_predictor[i, n + 1] + phi_right - phi_predictor[i, n] + phi_predictor[i - 1, n + 1];
+        r_upwind_i = phi[i, n] - phi[i - 1, n + 1] - phi[i - 1, n] + phi_left;
 
-        r_downwind_i = - phi_predictor[i, n + 1] + phi_right;
-        r_upwind_i = phi[i, n] - phi[i - 1, n + 1];
+        # WENO SHU
+        # U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
+        # D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
+        # ω1 = U / ( U + D );
+        # r = ( r_upwind_i + ϵ ) / ( r_downwind_i + ϵ )
+        # local l[i] = 1 - ω1 + ω1 * r;
+        # l[i] = maximum([0, minimum([l[i],1])])
+        # l[i] = maximum([0, minimum([l[i], r * (2 / abs(c[i]) + l[i-1])])])
 
         # ENO parameter
-        if abs(r_downwind_i_minus + r_downwind_i) <= abs(r_upwind_i_minus + r_upwind_i)
-            s[i,n+1] = 1
+        if abs(r_downwind_i) <= abs(r_upwind_i)
+            l[i] = 0
         else
-            s[i,n+1] = 0
+            l[i] = 1
         end
 
         # Second order solution
-        phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * s[i, n + 1] * (r_downwind_i_minus + r_downwind_i) - 0.5 * (1-s[i, n + 1]) * (r_upwind_i + r_upwind_i_minus ) ) ) / ( 1 + c[i] );
+        # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_downwind_i + ϵ)  ) ) / ( 1 + c[i] );
+
+        phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_upwind_i) - 0.5 * (1 - l[i]) * r_downwind_i  ) ) / ( 1 + c[i] );
     end
 
 end
@@ -162,7 +172,7 @@ trace3 = scatter(x = x, y = phi_1[:, end], mode = "lines", name = "Inverted sche
 
 layout = Layout(plot_bgcolor="white", 
                 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
-plot_phi = plot([trace1, trace2, trace3], layout)
+plot_phi = plot([trace1, trace2], layout)
 
 plot_phi
 
@@ -174,7 +184,7 @@ trace3_d = scatter(x = x, y = diff(phi_1[:, end]) / h, mode = "lines", name = "I
 layout_d = Layout(plot_bgcolor="white", 
 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 
-plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
+plod_d_phi = plot([trace1_d, trace2_d], layout_d)
 
 # Plot TVD
 trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))

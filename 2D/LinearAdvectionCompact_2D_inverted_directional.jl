@@ -8,7 +8,7 @@ include("../Utils/InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 0;
 
 # Courant number
 c = 5;
@@ -23,7 +23,7 @@ Nx = 100 * 2^level
 h = (x1R - x1L) / Nx
 
 # Velocity
-angle = 45 / 5 # angle in degrees
+angle = 45 # angle in degrees
 U = [cosd(angle), sind(angle)]
 
 # Time
@@ -106,7 +106,7 @@ for n = 1:Ntau
         r_downwind_n = phi_predictor[i, j, n] - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j - 1, n + 1] - phi_predictor[i - 1, j - 1, n + 1];
    
         # ENO parameter 
-        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 0 : p[i, j, n + 1] = 1;
+        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 0 : p[i, j, n + 1] = 0;
 
     # Second order solution
         phi[i, j, n + 1] = ( phi[i, j, n] + A * phi[i-1, j, n + 1] + B * phi[i, j-1, n + 1] + D * phi[i-1, j-1, n + 1] 

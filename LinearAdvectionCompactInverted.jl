@@ -10,14 +10,14 @@ include("Utils/InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 2;
 
 # Courant number
-C = 10
+C = 6
 
 # Grid settings
-xL = -0.5 * π #- 1 * π / 2
-xR = 2.5 * π #3 * π / 2
+xL = - 1 * π / 2
+xR = 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 x = range(xL, xR, length = Nx + 1)
@@ -34,7 +34,6 @@ Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
-Ntau = 1
 
 # c = u * tau / h
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
@@ -61,36 +60,36 @@ phi_first_order = zeros(Nx + 1, Ntau + 1);
 # Initial condition
 phi[:, 1] = phi_0.(x);
 phi_predictor[:, 1] = phi_0.(x);
-phi_predictor_n2[:, 1] = phi_0.(x);
 phi_first_order[:, 1] = phi_0.(x);
 
 # Boundary conditions
 phi[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_predictor[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor_n2[1, :] = phi_exact.(x[1], range(tau, (Ntau + 1) * tau, length = Ntau + 1));
 
 phi[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
 phi_predictor[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
 phi_first_order[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor_n2[end, :] = phi_exact.(x[end], range(tau, (Ntau + 1) * tau, length = Ntau + 1));
 
 # Ghost point on the time -1
 ghost_point_time = phi_exact.(x, -tau);
 
-# ENO parameters
-s = zeros(Nx + 1, Ntau + 1);
+# WENO parameters
+ϵ = 1e-8;
+ω0 = 1/3;
 
-eps = 1e-8;
+k = zeros(Nx + 1)
 
 # Time loop
 for n = 1:Ntau
 
-    if n > 1 && n < 2
+    if n > 1 
         phi_old = phi[:, n-1];
     else
         phi_old = ghost_point_time;
     end
+
+    phi_predictor_n2[1, n + 1] = phi_exact.(x[1], (n + 1) * tau);
 
     # Space loop
     for i = 2:1:Nx+1
@@ -102,28 +101,34 @@ for n = 1:Ntau
         phi_predictor[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         # Corrector
-        r_downwind_n_old = phi_predictor[i, n] - (c[i] > 0) * phi_predictor[i - 1, n + 1];
-        r_upwind_n_old = - (c[i] > 0) *  phi[i - 1, n] + phi_old[i];
+        r_downwind_n = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+        r_upwind_n = - (c[i] > 0) *  phi[i - 1, n] + phi_old[i] +  (c[i] > 0) * phi[i - 1, n + 1] - phi[i, n];
 
-        r_downwind_n_new = - phi_predictor[i, n + 1] + (c[i] > 0) * phi_predictor_n2[i - 1, n + 1];
-        r_upwind_n_new = (c[i] > 0) * phi[i - 1, n + 1] - phi[i, n];
+        # WENO - SHU
+        U = ω0 * ( 1 / ( ϵ + r_upwind_n )^2 );
+        D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_n )^2 );
+        ω2 = U / ( U + D );
+        r = ( r_upwind_n + ϵ ) / ( r_downwind_n + ϵ )
+        local k[i] = 1 - ω2 + ω2 * r;
+        k[i] = maximum([0, minimum([k[i],1])])
+        k[i] = maximum([0, minimum([k[i], r * (2 / abs(c[i]) + k[i-1])])]) 
 
-        # ENO parameter 
-        if abs(r_downwind_n_new + r_downwind_n_old) <= abs(r_upwind_n_new + r_upwind_n_old)
-            s[i,n+1] = 0
-        else
-            s[i,n+1] = 1
-        end
+        (r_downwind_n) * (r_upwind_n) < 0 ? A = 0 : A = 1;
 
-        A = 1;
-        if ( (r_downwind_n_new + r_downwind_n_old ) * (r_upwind_n_new + r_upwind_n_old ) < 0 ) 
-            A = 0;
-        end
+        # ENO parameter
+        # if abs(r_downwind_n) <= abs(r_upwind_n)
+        #     k[i] = 0
+        # else
+        #     k[i] = 1
+        # end
 
-        phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * A * ( (1-s[i,n + 1]) * (r_downwind_n_old + r_downwind_n_new) 
-                                                                    + (s[i,n + 1]) * (r_upwind_n_new + r_upwind_n_old ) ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
+        phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] 
+                                + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * ( A * k[i] * (r_downwind_n + ϵ) ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
         
-        
+        # phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] 
+        #                     + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * ( A * k[i] * (r_upwind_n) + A * (1 - k[i]) * r_downwind_n ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
+    
+    
         # Predictor for next time step
         phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
@@ -132,6 +137,8 @@ end
 
 
 # Print the error
+Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
+println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
 

@@ -11,20 +11,19 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
-
+level = 4
 # Courant number
 C = 8;
 
 # Level of correction
-p = 2;
+p = 1;
 
 # Level of predictor accuracy
-pA = 2;
+pA = 1;
 
 # Grid settings
-xL = -0.5  #- 1 * π / 2
-xR = 2.5  #3 * π / 2
+xL = -1 # - 1 * π / 2
+xR = 1 # 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -34,8 +33,8 @@ u(x) = 1
 
 # Initial condition
 # phi_0(x) = cos(x);
-phi_0(x) = piecewiseLinear(x);
-# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+# phi_0(x) = piecewiseLinear(x);
+phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - t);
@@ -51,7 +50,6 @@ Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
-# Ntau = 1
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
@@ -74,10 +72,11 @@ phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1)
 ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
-ω = zeros(Nx + 1, Ntau + 1);
 ω0 = 1/3;
-ω0 = (C*(2*C+3)+1)/(6*C*(C+1));
+# ω0 = (C*(2*C+3)+1)/(6*C*(C+1));
 ϵ = 1e-16;
+
+s = zeros(Nx + 1, Ntau + 1)
 
 # Space loop
 for i = 2:1:Nx+1
@@ -94,7 +93,7 @@ for i = 2:1:Nx+1
         if n > Ntau - 1
             phi_future = phi_exact.(x[i - 1], (n+1) * tau);
         else
-            phi_future = phi[i - 1, n + 2];
+            phi_future = phi_predictor[i - 1, n + 2];
         end
 
         # First order solution
@@ -119,20 +118,22 @@ for i = 2:1:Nx+1
                 phi_hat = phi[i, n + 1]
             end
         
-            r_downwind = phi[i, n] - phi[i - 1, n + 1] - phi_hat + phi_future;
+            r_downwind = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_hat + phi_future;
             r_upwind = - phi[i - 1, n] + phi_old + phi[i - 1, n + 1] - phi[i, n];
 
             # WENO SHU
             U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
             D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
-            ω[i, n] = U / ( U + D );
+            ω = U / ( U + D );
             r = ( r_upwind + ϵ ) / ( r_downwind + ϵ )
-            local s = 1 - ω[i, n] + ω[i, n] * r;
+            local s[i, n+1] = 1 - ω + ω * r;
+            s[i, n+1] = maximum([0, minimum([s[i, n+1],1])])
+            s[i, n+1] = maximum([0, minimum([s[i, n+1], r * (2 / abs(c[i]) + s[i-1, n+1])])])
 
-            # if (abs(r_downwind) + ϵ) < (abs(r_upwind) + ϵ)
-            #     ω[i, n] = 0;
+            # if (abs(r_downwind) + ϵ) <= (abs(r_upwind) + ϵ)
+            #     s[i] = 0;
             # else
-            #     ω[i, n] = 1;
+            #     s[i] = 1;
             # end
 
             # abs(r_upwind) < ϵ ? A = 0 : A = 1;
@@ -140,10 +141,10 @@ for i = 2:1:Nx+1
 
             # ENO version
             # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1]
-            # - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * r_downwind) ) / ( 1 + c[i] );
+            # - 0.5 * A * ( ( s[i] ) * r_upwind + ( 1 - s[i] ) * r_downwind) ) / ( 1 + c[i] );
 
             # WENO shu version
-            phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * s * ( r_downwind + ϵ ) ) / ( 1 + c[i] );
+            phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * s[i, n+1] * ( r_downwind + ϵ ) ) / ( 1 + c[i] );
 
             # Compute the solution with no predictor
             # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * ( phi[i, n] - phi[i - 1, n + 1] + phi_future ) ) ) / ( 1 + c[i] - 0.5 * A * (1 - ω[i, n]) );
@@ -152,7 +153,7 @@ for i = 2:1:Nx+1
     end
 end
 
-CSV.write("phi.csv", DataFrame(phi, :auto))
+# CSV.write("phi.csv", DataFrame(phi, :auto))
 
 # df = CSV.File("phi_normal.csv") |> DataFrame
 # phi_1 = Matrix(df)

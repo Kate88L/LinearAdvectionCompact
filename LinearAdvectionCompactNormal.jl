@@ -11,14 +11,14 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 4;
 
 # Courant number
-C = 6
+C = 5
 
 # Grid settings
-xL =   - 1 * π / 2
-xR =  3 * π / 2
+xL = - 1  * π / 2
+xR = 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -75,7 +75,7 @@ ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau +
 
 # WENO parameters
 ϵ = 1e-8;
-ω0 = 1/3;
+ω = zeros(Nx + 1)
 
 l = zeros(Nx + 1)
 
@@ -91,7 +91,7 @@ for n = 1:Ntau
         end
 
         if i < Nx + 1
-            phi_right = phi_predictor[i + 1, n];
+            phi_right = phi[i + 1, n];
         else
             phi_right = phi_exact(xR + h, (n-1) * tau) ;
         end
@@ -103,29 +103,32 @@ for n = 1:Ntau
         phi_predictor[i, n + 1] = ( phi[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
 
         # Corrector
-        r_downwind_i = - phi_predictor[i, n + 1] + phi_right - phi_predictor[i, n] + phi_predictor[i - 1, n + 1];
+        r_downwind_i = - phi_predictor[i, n + 1] + phi_right - phi[i, n] + phi_predictor[i - 1, n + 1];
         r_upwind_i = phi[i, n] - phi[i - 1, n + 1] - phi[i - 1, n] + phi_left;
 
         # WENO SHU
         # U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
         # D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
-        # ω1 = U / ( U + D );
-        # r = ( r_upwind_i + ϵ ) / ( r_downwind_i + ϵ )
-        # local l[i] = 1 - ω1 + ω1 * r;
-        # l[i] = maximum([0, minimum([l[i],1])])
-        # l[i] = maximum([0, minimum([l[i], r * (2 / abs(c[i]) + l[i-1])])])
+        ω[i] = (2 + c[i]) / 6;
+        r = ( r_upwind_i + ϵ ) / ( r_downwind_i + ϵ )
+        local l[i] = 1 - ω[i] + ω[i] * r;
+        l[i] = maximum([-1, minimum([l[i],2])])
+        l[i] = maximum([-1, minimum([l[i], r * (2 / abs(c[i]) + l[i-1])])])
 
         # ENO parameter
-        if abs(r_downwind_i) <= abs(r_upwind_i)
-            l[i] = 0
-        else
-            l[i] = 1
-        end
+        # if abs(r_downwind_i) <= abs(r_upwind_i)
+        #     l[i] = 0
+        # else
+        #     l[i] = 1
+        # end
 
-        # Second order solution
+        # WENO correction
         # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_downwind_i + ϵ)  ) ) / ( 1 + c[i] );
 
-        phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_upwind_i) - 0.5 * (1 - l[i]) * r_downwind_i  ) ) / ( 1 + c[i] );
+        # No predictors
+        phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (phi_right - phi[i, n] + phi[i - 1, n + 1] + ϵ)  ) ) / ( 1 + c[i] - 0.5 * l[i] * c[i])
+
+        # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_upwind_i) - 0.5 * (1 - l[i]) * r_downwind_i  ) ) / ( 1 + c[i] );
     end
 
 end
@@ -158,16 +161,17 @@ df = CSV.File("phi.csv") |> DataFrame
 phi_1 = Matrix(df)
 
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
+println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf))
 
 # Print first order error
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf)* h)
+println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Normal scheme", line=attr(color="firebrick", width=2))
 trace2 = scatter(x = x, y = phi_exact.(x, Ntau * tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
 trace3 = scatter(x = x, y = phi_1[:, end], mode = "lines", name = "Inverted scheme", line=attr(color="royalblue", width=2))
+trace4 = scatter(x = x, y = phi_first_order[:, end], mode = "lines", name = "First-order", line=attr(color="royalblue", width=2, dash="dash"))
 
 
 layout = Layout(plot_bgcolor="white", 
@@ -180,6 +184,7 @@ plot_phi
 trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Normal sol. gradient")
 trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
 trace3_d = scatter(x = x, y = diff(phi_1[:, end]) / h, mode = "lines", name = "Inverted sol. gradient")
+trace4_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient", line=attr(color="royalblue", width=2, dash="dash"));
 
 layout_d = Layout(plot_bgcolor="white", 
 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))

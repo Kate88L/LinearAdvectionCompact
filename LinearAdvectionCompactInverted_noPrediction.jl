@@ -11,9 +11,9 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4
+level = 3
 # Courant number
-C = 8;
+C = 5;
 
 # Level of correction
 p = 1;
@@ -22,8 +22,8 @@ p = 1;
 pA = 1;
 
 # Grid settings
-xL = -1 # - 1 * π / 2
-xR = 1 # 3 * π / 2
+xL = - 1 # * π / 2
+xR = 1 #3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -72,8 +72,8 @@ phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1)
 ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
-ω0 = 1/3;
-# ω0 = (C*(2*C+3)+1)/(6*C*(C+1));
+ω = zeros(Nx +1);
+ω0 = (C*(2*C+3)+1)/(6*C*(C+1));
 ϵ = 1e-16;
 
 s = zeros(Nx + 1, Ntau + 1)
@@ -93,7 +93,7 @@ for i = 2:1:Nx+1
         if n > Ntau - 1
             phi_future = phi_exact.(x[i - 1], (n+1) * tau);
         else
-            phi_future = phi_predictor[i - 1, n + 2];
+            phi_future = phi[i - 1, n + 2];
         end
 
         # First order solution
@@ -118,36 +118,40 @@ for i = 2:1:Nx+1
                 phi_hat = phi[i, n + 1]
             end
         
-            r_downwind = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_hat + phi_future;
+            r_downwind = phi_predictor[i, n] - phi[i - 1, n + 1] - phi_hat + phi_future;
             r_upwind = - phi[i - 1, n] + phi_old + phi[i - 1, n + 1] - phi[i, n];
 
             # WENO SHU
-            U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
-            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
-            ω = U / ( U + D );
+            # U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
+            # D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
+            # ω[i] = U / ( U + D );
+            ω[i] = (c[i] * ( 2 * c[i] + 3 ) + 1 ) / ( 6 * c[i] * (c[i] + 1));
+            # ω[i] = 1/3;
             r = ( r_upwind + ϵ ) / ( r_downwind + ϵ )
-            local s[i, n+1] = 1 - ω + ω * r;
-            s[i, n+1] = maximum([0, minimum([s[i, n+1],1])])
+            local s[i, n+1] = 1 - ω[i] + ω[i] * r;
+            s[i, n+1] = maximum([0, minimum([s[i, n+1], 2])])
             s[i, n+1] = maximum([0, minimum([s[i, n+1], r * (2 / abs(c[i]) + s[i-1, n+1])])])
 
             # if (abs(r_downwind) + ϵ) <= (abs(r_upwind) + ϵ)
-            #     s[i] = 0;
+            #     s[i, n] = 0;
             # else
-            #     s[i] = 1;
+            #     s[i, n] = 1;
             # end
 
             # abs(r_upwind) < ϵ ? A = 0 : A = 1;
-            (r_downwind) * (r_upwind) < 0 ? A = 0 : A = 1;
+            (r_downwind) * (r_upwind) < 0 ? A = 1 : A = 1;
 
             # ENO version
             # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1]
             # - 0.5 * A * ( ( s[i] ) * r_upwind + ( 1 - s[i] ) * r_downwind) ) / ( 1 + c[i] );
 
             # WENO shu version
-            phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * s[i, n+1] * ( r_downwind + ϵ ) ) / ( 1 + c[i] );
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * s[i, n+1] * ( r_downwind + ϵ ) ) / ( 1 + c[i] );
+
+            phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * s[i, n+1] * ( phi[i, n] - phi[i - 1, n + 1] + phi_future + ϵ ) ) / ( 1 + c[i] - 0.5 * A * s[i, n+1]);
 
             # Compute the solution with no predictor
-            # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * ( ( ω[i, n] ) * r_upwind + ( 1 - ω[i, n] ) * ( phi[i, n] - phi[i - 1, n + 1] + phi_future ) ) ) / ( 1 + c[i] - 0.5 * A * (1 - ω[i, n]) );
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] - 0.5 * A * ( ( s[i, n] ) * r_upwind + ( 1 - s[i, n] ) * ( phi[i, n] - phi[i - 1, n + 1] + phi_future ) ) ) / ( 1 + c[i] - 0.5 * A * (1 - s[i, n]) );
         end
 
     end
@@ -162,11 +166,11 @@ end
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
+println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
 
 # Print first order error
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf)* h)
+println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
 
 println("=============================")
 

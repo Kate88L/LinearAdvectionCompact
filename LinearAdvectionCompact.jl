@@ -11,10 +11,10 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 4;
 
 # Courant number
-C = 6;
+C = 5;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -111,7 +111,7 @@ for n = 1:Ntau
     for i = 2:1:Nx + 1
 
         if i < Nx + 1
-            phi_right = phi_predictor_i[i + 1, n]
+            phi_right = phi[i + 1, n]
         else
             phi_right = phi_exact(xR + h, (n-1) * tau);
         end
@@ -126,11 +126,11 @@ for n = 1:Ntau
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
         
         # Predictor
-        phi_predictor_i[i, n + 1] = ( phi_predictor_i[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+        phi_predictor_i[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
         phi_predictor_n[i, n + 1] =  ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         # Corrector
-        r_downwind_i = - phi_predictor_i[i, n] + phi_predictor_i[i - 1, n + 1] - phi_predictor_i[i, n + 1] + phi_right;
+        r_downwind_i = - phi[i, n] + phi_predictor_i[i - 1, n + 1] - phi_predictor_i[i, n + 1] + phi_right;
         r_upwind_i = -  phi[i - 1, n] + phi_left + phi[i, n] - phi[i - 1, n + 1];
 
         r_downwind_n = phi_predictor_n[i, n] - phi_predictor_n[i - 1, n + 1] - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
@@ -196,11 +196,11 @@ end
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
+println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
 
 # Print first order error
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf)* h)
+println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
 
 println("=============================")
 
@@ -254,7 +254,7 @@ plot_phi = plot([ trace2, trace3], layout)
 
 plot_phi
 
-# CSV.write("c_1.6.csv", DataFrame(phi,:auto))
+CSV.write("phi.csv", DataFrame(phi,:auto))
 
 # Plot of the numerical derivative of the solution and the exact solution at the final time
 trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")

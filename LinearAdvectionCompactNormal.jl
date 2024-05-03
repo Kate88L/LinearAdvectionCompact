@@ -11,10 +11,12 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 5;
+level = 4
 
+# Level of correction
+p = 1
 # Courant number
-C = 8
+C = 1
 
 # Grid settings
 xL = 0 # - 1  * π / 2
@@ -47,7 +49,6 @@ Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
-# Ntau = 1
 
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
@@ -75,6 +76,7 @@ ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau +
 
 # WENO parameters
 ϵ = 1e-8;
+ω0 = 1/3;
 ω = zeros(Nx + 1)
 
 l = zeros(Nx + 1)
@@ -84,52 +86,68 @@ for n = 1:Ntau
     # Space loop
     for  i = 2:1:Nx + 1
 
-        if i > 2
-            phi_left = phi[i - 2, n + 1];
-        else
-            phi_left = ghost_point_left[n];
-        end
-
-        if i < Nx + 1
-            phi_right = phi[i + 1, n];
-        else
-            phi_right = phi_exact(xR + h, (n-1) * tau) ;
-        end
-
-        # First order solution
+       # First order solution
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c[i] *  phi_first_order[i - 1, n + 1] ) / ( 1 + c[i] );
-        
-        # Predictor
-        phi_predictor[i, n + 1] = ( phi[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
+    
+        for j = 1:p 
 
-        # Corrector
-        r_downwind_i = - phi_predictor[i, n + 1] + phi_right - phi[i, n] + phi_predictor[i - 1, n + 1];
-        r_upwind_i = phi[i, n] - phi[i - 1, n + 1] - phi[i - 1, n] + phi_left;
+            # Predictor
+            phi_predictor[i, n + 1] = ( phi[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
 
-        # WENO SHU
-        U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
-        D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
-        ω[i] = U / ( U + D );
-        ω[i] = (2 + c[i]) / 6;
-        r = ( r_upwind_i + ϵ ) / ( r_downwind_i + ϵ )
-        local l[i] = 1 - ω[i] + ω[i] * r;
-        l[i] = maximum([-1, minimum([l[i],2])])
-        l[i] = maximum([-1, minimum([l[i], r * (2 / abs(c[i]) + l[i-1])])])
+            if i > 2
+                phi_left = phi[i - 2, n + 1];
+            else
+                phi_left = ghost_point_left[n];
+            end
+    
+            if i < Nx + 1
+                phi_right = phi[i + 1, n];
+            else
+                phi_right = phi_exact(xR + h, (n-1) * tau) ;
+            end
 
-        # ENO parameter
-        # if abs(r_downwind_i) <= abs(r_upwind_i)
-        #     l[i] = 0
-        # else
-        #     l[i] = 1
-        # end
+            # Corrector
+            if j < 2
+                r_downwind_i = - phi_predictor[i, n + 1] + phi_right - phi[i, n] + phi_predictor[i - 1, n + 1];
+            else
+                r_downwind_i = - phi[i, n + 1] + phi_right - phi[i, n] + phi[i - 1, n + 1];
+            end
 
-        # WENO correction
-        # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_downwind_i + ϵ)  ) ) / ( 1 + c[i] );
+            r_upwind_i = phi[i, n] - phi[i - 1, n + 1] - phi[i - 1, n] + phi_left;
 
-        # No predictors
-        phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (phi_right - phi[i, n] + phi[i - 1, n + 1] + ϵ)  ) ) / ( 1 + c[i] - 0.5 * l[i] * c[i])
+            # WENO SHU
+            U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
+            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
+            ω[i] = U / ( U + D );
 
-        # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_upwind_i) - 0.5 * (1 - l[i]) * r_downwind_i  ) ) / ( 1 + c[i] );
+            # Space-Time limiter
+            # ω[i] = (2 + c[i]) / 6;
+            # r = ( r_upwind_i + ϵ ) / ( r_downwind_i + ϵ )
+            # local l[i] = 1 - ω[i] + ω[i] * r;
+            # l[i] = maximum([-1, minimum([l[i],2])])
+            # l[i] = maximum([-1, minimum([l[i], r * (2 / abs(c[i]) + l[i-1])])])
+
+            # ENO parameter
+            # if abs(r_downwind_i) <= abs(r_upwind_i)
+            #     ω[i] = 0
+            # else
+            #     ω[i] = 1
+            # end
+
+            # Space-Time correction
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (r_downwind_i + ϵ)  ) ) / ( 1 + c[i] );
+
+            # WENO / ENO correction
+            phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * ( 1 - ω[i] ) * (r_downwind_i) - 0.5 * ω[i] * (r_upwind_i) ) ) / ( 1 + c[i] );
+
+            # No predictors (WENO)
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * ( 1 - ω[i] ) * ( phi_right - phi[i, n] + phi[i - 1, n + 1])
+            #                                     - 0.5 * ω[i] * (r_upwind_i) ) ) / ( 1 + c[i] - 0.5 * c[i] * ( 1 - ω[i] ) );
+
+            # No predictors (Space-Time limiter)
+            # phi[i, n + 1] = ( phi[i, n] + c[i] * ( phi[i - 1, n + 1] - 0.5 * l[i] * (phi_right - phi[i, n] + phi[i - 1, n + 1] + ϵ)  ) ) / ( 1 + c[i] - 0.5 * l[i] * c[i])
+        end
+    
     end
 
 end

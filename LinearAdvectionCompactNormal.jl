@@ -11,38 +11,38 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
+level = 5;
 
 # Courant number
-C = 5
+C = 8
 
 # Grid settings
-xL = - 1  * π / 2
-xR = 3 * π / 2
+xL = 0 # - 1  * π / 2
+xR = 3 # 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u(x) = 1 + 3/4 * cos(x)
-# u(x) = 1
+# u(x) = 1 + 3/4 * cos(x)
+u(x) = 1
 
 # Initial condition
-phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
+# phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = cos.(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
-# phi_0(x) = piecewiseLinear(x);
+phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = exp(-x.^2 *1000)
 
 # Exact solution
-phi_exact(x, t) = cosVelocityNonSmooth(x, t);
-# phi_exact(x, t) = phi_0.(x - t);
+# phi_exact(x, t) = cosVelocityNonSmooth(x, t);
+phi_exact(x, t) = phi_0.(x - t);
 
 # Grid initialization
 x = range(xL, xR, length = Nx + 1)
 
 # Time settings
 T = 8 * π / sqrt(7)
-# T = 1
+T = 1
 Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
@@ -107,8 +107,9 @@ for n = 1:Ntau
         r_upwind_i = phi[i, n] - phi[i - 1, n + 1] - phi[i - 1, n] + phi_left;
 
         # WENO SHU
-        # U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
-        # D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
+        U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
+        D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
+        ω[i] = U / ( U + D );
         ω[i] = (2 + c[i]) / 6;
         r = ( r_upwind_i + ϵ ) / ( r_downwind_i + ϵ )
         local l[i] = 1 - ω[i] + ω[i] * r;

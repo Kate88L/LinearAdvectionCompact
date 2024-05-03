@@ -11,9 +11,9 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3
+level = 5
 # Courant number
-C = 5;
+C = 8;
 
 # Level of correction
 p = 1;
@@ -22,8 +22,8 @@ p = 1;
 pA = 1;
 
 # Grid settings
-xL = - 1 # * π / 2
-xR = 1 #3 * π / 2
+xL = 0 # * π / 2
+xR = 3 #3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -33,8 +33,8 @@ u(x) = 1
 
 # Initial condition
 # phi_0(x) = cos(x);
-# phi_0(x) = piecewiseLinear(x);
-phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - t);
@@ -122,15 +122,15 @@ for i = 2:1:Nx+1
             r_upwind = - phi[i - 1, n] + phi_old + phi[i - 1, n + 1] - phi[i, n];
 
             # WENO SHU
-            # U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
-            # D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
-            # ω[i] = U / ( U + D );
+            U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
+            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
+            ω[i] = U / ( U + D );
             ω[i] = (c[i] * ( 2 * c[i] + 3 ) + 1 ) / ( 6 * c[i] * (c[i] + 1));
             # ω[i] = 1/3;
             r = ( r_upwind + ϵ ) / ( r_downwind + ϵ )
             local s[i, n+1] = 1 - ω[i] + ω[i] * r;
-            s[i, n+1] = maximum([0, minimum([s[i, n+1], 2])])
-            s[i, n+1] = maximum([0, minimum([s[i, n+1], r * (2 / abs(c[i]) + s[i-1, n+1])])])
+            s[i, n+1] = maximum([-1, minimum([s[i, n+1], 2])])
+            s[i, n+1] = maximum([-1, minimum([s[i, n+1], r * (2 / abs(1/c[i]) + s[i-1, n+1])])])
 
             # if (abs(r_downwind) + ϵ) <= (abs(r_upwind) + ϵ)
             #     s[i, n] = 0;

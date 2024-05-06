@@ -11,10 +11,10 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 4;
 
 # Courant number
-C = 1
+C = 5
 
 # Level of correction
 p = 1;
@@ -23,32 +23,32 @@ p = 1;
 pA = 1;
 
 # Grid settings
-xL = 0 #- 1 * π / 2
-xR = 3 #3 * π / 2
+xL = - 1 * π / 2
+xR = 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-# u(x) = 1 + 3/4 * cos(x)
-u(x) = 1
+u(x) = 1 + 3/4 * cos(x)
+# u(x) = 1
 
 # Initial condition
-# phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
+phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = cos.(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
-phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = exp(-x.^2 *1000)
 
 # Exact solution
-# phi_exact(x, t) = cosVelocityNonSmooth(x, t);
-phi_exact(x, t) = phi_0.(x - t);
+phi_exact(x, t) = cosVelocityNonSmooth(x, t);
+# phi_exact(x, t) = phi_0.(x - t);
 
 # Grid initialization
 x = range(xL, xR, length = Nx + 1)
 
 # Time settings
 T = 8 * π / sqrt(7)
-T = 1
+# T = 1
 Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
@@ -125,7 +125,6 @@ for n = 1:Ntau
                 r_downwind = - phi[i, n] + phi_predictor[i - 1, n + 1] - phi_predictor[i, n + 1] + phi_right;
             else
                 r_downwind = - phi[i, n] + phi[i - 1, n + 1] - phi[i, n + 1] + phi_right;
-                println("r_downwind: ", r_downwind)
             end
 
             r_upwind = - phi[i - 1, n] + phi_left + phi[i, n] - phi[i - 1, n + 1];
@@ -160,9 +159,6 @@ for n = 1:Ntau
 
 end
 
-Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
-println("Error t*h: ", Error_t_h)
-
 # Compute TVD property of the derivative
 phi_d = zeros(Nx + 1, Ntau + 1)
 phi_dd = zeros(Nx + 1, Ntau + 1)
@@ -187,12 +183,15 @@ end
 df = CSV.File("phi.csv") |> DataFrame
 phi_1 = Matrix(df)
 
-println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) * h)
+Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
+println("Error t*h: ", Error_t_h)
+println("Error L2: ", norm(phi[:,end] - phi_exact.(x, (Ntau) * tau), 2) * h)
+println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, (Ntau) * tau), Inf) )
+println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
 
 # Print first order error
-println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf)* h)
+println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, (Ntau+1) * tau), 2) * h)
+println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, (Ntau+1) * tau), Inf))
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Normal scheme", line=attr(color="firebrick", width=2))
@@ -202,7 +201,7 @@ trace4 = scatter(x = x, y = phi_first_order[:, end], mode = "lines", name = "Fir
 
 layout = Layout(plot_bgcolor="white", 
                 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
-plot_phi = plot([trace1, trace2], layout)
+plot_phi = plot([trace1, trace2, trace3], layout)
 
 plot_phi
 
@@ -215,7 +214,7 @@ trace4_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines",
 layout_d = Layout(plot_bgcolor="white", 
 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 
-plod_d_phi = plot([trace1_d, trace2_d], layout_d)
+plod_d_phi = plot([trace1_d, trace2_d, trace3_d], layout_d)
 
 # Plot TVD
 trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))

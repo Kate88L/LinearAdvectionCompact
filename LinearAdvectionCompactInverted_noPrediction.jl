@@ -11,16 +11,16 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4
+level = 0
 # Courant number
-C = 2;
+C = 3;
 
 # Level of correction
 p = 1;
 
 # Grid settings
-xL = 0 # * π / 2
-xR = 3 #3 * π / 2
+xL = -1 # -1 * π / 2
+xR = 1 # 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -30,8 +30,8 @@ u(x) = 1
 
 # Initial condition
 # phi_0(x) = cos(x);
-phi_0(x) = piecewiseLinear(x);
-# phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
+# phi_0(x) = piecewiseLinear(x);
+phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - t);

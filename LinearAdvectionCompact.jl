@@ -11,13 +11,13 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
+level = 3;
 
 # Level of correction
-p = 2;
+p = 1;
 
 # Courant number
-C = 5;
+C = 2;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -26,9 +26,9 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u(x) = 1 + 3/4 * cos(x)
+# u(x) = 1 + 3/4 * cos(x)
 # u(x) = 2 + 3/2 * cos(x)
-# u(x) = 1
+u(x) = 1
 
 # Initial condition
 phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
@@ -36,9 +36,9 @@ phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
-phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
+# phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
 # phi_exact(x, t) = cosVelocitySmooth(x, t);
-# phi_exact(x, t) = phi_0.(x - t);             
+phi_exact(x, t) = phi_0.(x - t);             
 
 ## Comptutation
 
@@ -46,7 +46,7 @@ phi_exact(x, t) = cosVelocityNonSmooth(x, t);
 x = range(xL, xR, length = Nx + 1)
 
 # Time
-T = 8 * π / sqrt(7)
+T = 8 * π / sqrt(7) * 2
 # T = π / sqrt(3)
 # tau = C * h / u
 Ntau = 100 * 2^level
@@ -58,6 +58,19 @@ c = zeros(Nx+1) .+ u.(x) * tau / h
 
 c_hat = [min(c_val, 1) for c_val in c]
 d = max.(0,c - c_hat)
+
+c_hat = zeros(Nx + 1)
+d = zeros(Nx + 1)
+
+for i = 1:Nx + 1
+    if c[i] >= 1/2
+       d[i] = c[i];
+       c_hat[i] = 0;
+    elseif c[i] < 1/2
+       c_hat[i] = c[i]
+       d[i] = 0;
+    end
+end
 
 
 phi = zeros(Nx + 1, Ntau + 1);
@@ -95,7 +108,7 @@ ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau +
 ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
-ϵ = 1e-8;
+ϵ = 1e-16;
 ω0 = 1/3;
 α0 = 1/3;
 
@@ -114,18 +127,18 @@ for n = 1:Ntau
         phi_old = ghost_point_time;
     end
 
-    # Space loop
-    for i = 2:1:Nx + 1
+    # Number of corrector steps
+    for j = 1:p
 
-        # First order solution
-        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
-        
+        # Space loop
+        for i = 2:1:Nx + 1
 
-        for j = 1:p
-
+            # First order solution
+            phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            
             # Predictor
             phi_predictor_i[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
-            phi_predictor_n[i, n + 1] =  ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            phi_predictor_n[i, n + 1] =  ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) ); 
 
             if i < Nx + 1
                 phi_right = phi[i + 1, n]
@@ -139,17 +152,16 @@ for n = 1:Ntau
                 phi_left = ghost_point_left[n];
             end
 
-
             # Corrector
             if j < 2
                 r_downwind_i = - phi[i, n] + phi_predictor_i[i - 1, n + 1] - phi_predictor_i[i, n + 1] + phi_right;
                 r_downwind_n = phi_predictor_n[i, n] - phi_predictor_n[i - 1, n + 1] - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
             else
                 r_downwind_i = - phi[i, n] + phi[i - 1, n + 1] - phi[i, n + 1] + phi_right;
-                r_downwind_n = phi[i, n] - phi[i - 1, n + 1] - phi[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+                r_downwind_n = phi_predictor_n[i, n] - phi_predictor_n[i - 1, n + 1] - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
             end
 
-            r_upwind_i = -  phi[i - 1, n] + phi_left + phi[i, n] - phi[i - 1, n + 1];
+            r_upwind_i = - phi[i - 1, n] + phi_left + phi[i, n] - phi[i - 1, n + 1];
             r_upwind_n = phi[i - 1, n + 1] - phi[i, n] - phi[i - 1, n] + phi_old[i];
 
             # WENO SHU
@@ -200,10 +212,15 @@ for n = 1:Ntau
                 - 0.5 * c_hat[i] * ( ω[i] * r_upwind_i + ( 1 - ω[i]) * r_downwind_i ) 
                 - 0.5 * d[i] / c[i] * ( α[i] * r_upwind_n + ( 1 - α[i]) * r_downwind_n  ) ) / ( 1 + c[i] + velocity_der );
 
+            # Corrector WENO / ENO combined 
+            # phi[i, n + 1] = ( phi[i, n] +  max( 0, min( 1, c[i] - 1/2 ) ) * (  0.5/(c[i] + ϵ) * (c[i] - c[i-1]) * phi[i, n] ) + c[i] * phi[i - 1, n + 1]
+            # - 0.5 * c[i] * max( 0, min( 1, c[i] ) ) * ( (1 - ω[i]) * r_downwind_i + ω[i] * r_upwind_i ) 
+            #        - 0.5 * max( 0, min( 1, c[i] - 1/2 ) ) * ( (1 - α[i]) * r_downwind_n + α[i] * r_upwind_n ) ) / ( 1 + c[i] + max( 0, min( 1, c[i] - 1/2 ) ) * 0.5 / (c[i] + ϵ) * (c[i] - c[i-1]) );
+
+            # Predictor for next time step
+            phi_predictor_n2[i, n + 1] =  ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         end
-        # Predictor for next time step
-        phi_predictor_n2[i, n + 1] =  ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
     end
 end
@@ -213,6 +230,8 @@ Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 
 println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
+println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
+
 
 # Print first order error
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
@@ -282,10 +301,12 @@ layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = 
 plod_d_phi = plot([trace1_d, trace2_d], layout_d)
 
 # Plot TVD
+trace_ω = scatter(x = x, y = ω, mode = "lines", name = "ω", line=attr(color="firebrick", width=2))
+trace_α = scatter(x = x, y = α, mode = "lines", name = "α", line=attr(color="royalblue", width=2))
 trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
 trace_tvd_1 = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD_1, mode = "lines", name = "TVD first order", line=attr(color="royalblue", width=2))
 layout_tvd = Layout(title = "TVD")
-plot_tvd = plot([trace_tvd], layout_tvd)
+plot_tvd = plot([trace_ω, trace_α], layout_tvd)
 
 
 p = [plot_phi; plod_d_phi]

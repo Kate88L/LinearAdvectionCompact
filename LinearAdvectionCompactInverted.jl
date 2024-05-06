@@ -10,14 +10,17 @@ include("Utils/InitialFunctions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 5;
+level = 3;
+
+# Level of correction
+p = 2;
 
 # Courant number
-C = 4
+C = 2
 
 # Grid settings
-xL = 0 # - 1 * π / 2
-xR = 3 # 3 * π / 2
+xL = - 1 * π / 2
+xR = 3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 x = range(xL, xR, length = Nx + 1)
@@ -27,8 +30,8 @@ x = range(xL, xR, length = Nx + 1)
 u(x) = 1;
 
 # Time
-# T = 8 * π / sqrt(7)
-T = 1
+T = 8 * π / sqrt(7) * 2
+# T = 1
 # tau = C * h / u
 Ntau = 100 * 2^level
 tau = T / Ntau
@@ -39,7 +42,8 @@ Ntau = Int(round(T / tau))
 c = zeros(Nx+1,1) .+ u.(x) * tau / h
 
 # Initial condition
-phi_0(x) = piecewiseLinear(x);
+phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
+# phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = makePeriodic(allInOne,-1,1)(x);
 # phi_0(x) = piecewiseConstant(x);
 # phi_0(x) = makePeriodic(continuesMix,-1,1)(x);
@@ -92,49 +96,57 @@ for n = 1:Ntau
 
     phi_predictor_n2[1, n + 1] = phi_exact.(x[1], (n + 1) * tau);
 
-    # Space loop
-    for i = 2:1:Nx+1
+    for j = 1:p
 
-        # First order solution
-        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+        # Space loop
+        for i = 2:1:Nx+1
 
-        # Predictor
-        phi_predictor[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            # First order solution
+            phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
-        # Corrector
-        r_downwind_n = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
-        r_upwind_n = - (c[i] > 0) *  phi[i - 1, n] + phi_old[i] +  (c[i] > 0) * phi[i - 1, n + 1] - phi[i, n];
+            # Predictor
+            phi_predictor[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
-        # WENO SHU
-        U = ω0 * ( 1 / ( ϵ + r_upwind_n )^2 );
-        D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_n )^2 );
-        ω[i] = U / ( U + D );
+            # Corrector
+            if j < p 
+                r_downwind_n = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+            else
+                r_downwind_n = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+            end
+           
+            r_upwind_n = - (c[i] > 0) *  phi[i - 1, n] + phi_old[i] +  (c[i] > 0) * phi[i - 1, n + 1] - phi[i, n];
 
-        # Space - Time limiter
-        # ω[i] = (2 + ( 1 / c[i] )) / 6;
-        # r = ( r_upwind_n + ϵ ) / ( r_downwind_n + ϵ )
-        # local s[i] = 1 - ω[i] + ω[i] * r;
-        # s[i] = maximum([-1, minimum([s[i], 2])])
-        # s[i] = maximum([-1, minimum([s[i], r * (2 / abs(1/c[i]) + s[i-1])])])
+            # WENO SHU
+            U = ω0 * ( 1 / ( ϵ + r_upwind_n )^2 );
+            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_n )^2 );
+            ω[i] = U / ( U + D );
 
-        # if (abs(r_downwind_n) + ϵ) <= (abs(r_upwind_n) + ϵ)
-        #     ω[i]  = 0;
-        # else
-        #     ω[i]  = 1;
-        # end
+            # Space - Time limiter
+            # ω[i] = (2 + ( 1 / c[i] )) / 6;
+            # r = ( r_upwind_n + ϵ ) / ( r_downwind_n + ϵ )
+            # local s[i] = 1 - ω[i] + ω[i] * r;
+            # s[i] = maximum([-1, minimum([s[i], 2])])
+            # s[i] = maximum([-1, minimum([s[i], r * (2 / abs(1/c[i]) + s[i-1])])])
 
-        # Corrector Space - Time limiter
-        # phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] 
-        #                         + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * ( s[i] * (r_downwind_n + ϵ) ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
+            # if (abs(r_downwind_n) + ϵ) <= (abs(r_upwind_n) + ϵ)
+            #     ω[i]  = 0;
+            # else
+            #     ω[i]  = 1;
+            # end
+
+            # Corrector Space - Time limiter
+            # phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] 
+            #                         + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * ( s[i] * (r_downwind_n + ϵ) ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
+            
+            # Corrector WENO
+            phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] 
+                                + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * ( ω[i] * r_upwind_n +  (1 - ω[i]) * r_downwind_n ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
         
-        # Corrector WENO
-        phi[i, n + 1] = ( phi[i, n] + 0.5/c[i] * (c[i] - c[i-1]) * phi[i, n] 
-                            + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] - 0.5 * ( ω[i] * r_upwind_n +  (1 - ω[i]) * r_downwind_n ) ) / ( 1 + abs(c[i]) + 0.5 / c[i] * (c[i] - c[i-1]) );
-    
-    
-        # Predictor for next time step
-        phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+        
+            # Predictor for next time step
+            phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
+        end
     end
 end
 

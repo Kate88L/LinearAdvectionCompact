@@ -11,16 +11,16 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4
+level = 1
 
 # Level of correction
-p = 1
+p = 2
 # Courant number
 C = 1
 
 # Grid settings
-xL = 0 # - 1  * π / 2
-xR = 3 # 3 * π / 2
+xL = - 1  * π / 2
+xR =  3 * π / 2
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -29,10 +29,10 @@ h = (xR - xL) / Nx
 u(x) = 1
 
 # Initial condition
-# phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
-# phi_0(x) = cos.(x);
+phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
+# phi_0(x) = cos(x);
 # phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
-phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = piecewiseLinear(x);
 # phi_0(x) = exp(-x.^2 *1000)
 
 # Exact solution
@@ -43,8 +43,8 @@ phi_exact(x, t) = phi_0.(x - t);
 x = range(xL, xR, length = Nx + 1)
 
 # Time settings
-T = 8 * π / sqrt(7)
-T = 1
+T = 8 * π / sqrt(7) * 2
+# T = 1
 Ntau = 100 * 2^level
 tau = T / Ntau
 tau = C * h / maximum(u.(x))
@@ -67,9 +67,9 @@ phi[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_predictor[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 
-phi[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-phi_first_order[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+# phi[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+# phi_first_order[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+# phi_predictor[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
 
 # Ghost point on the left side 
 ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau + 1));
@@ -83,16 +83,16 @@ l = zeros(Nx + 1)
 
 # Time loop
 for n = 1:Ntau
+
+    for j = 1:p 
     # Space loop
     for  i = 2:1:Nx + 1
 
        # First order solution
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c[i] *  phi_first_order[i - 1, n + 1] ) / ( 1 + c[i] );
-    
-        for j = 1:p 
 
-            # Predictor
-            phi_predictor[i, n + 1] = ( phi[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
+        # Predictor
+        phi_predictor[i, n + 1] = ( phi[i, n] + c[i] *  phi[i - 1, n + 1] ) / ( 1 + c[i] );
 
             if i > 2
                 phi_left = phi[i - 2, n + 1];

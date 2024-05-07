@@ -26,9 +26,9 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-# u(x) = 1 + 3/4 * cos(x)
+u(x) = 1 + 3/4 * cos(x)
 # u(x) = 2 + 3/2 * cos(x)
-u(x) = 1
+# u(x) = 1
 
 # Initial condition
 phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
@@ -36,9 +36,9 @@ phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
-# phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
+phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
 # phi_exact(x, t) = cosVelocitySmooth(x, t);
-phi_exact(x, t) = phi_0.(x - t);             
+# phi_exact(x, t) = phi_0.(x - t);             
 
 ## Comptutation
 
@@ -59,18 +59,18 @@ c = zeros(Nx+1) .+ u.(x) * tau / h
 c_hat = [min(c_val, 1) for c_val in c]
 d = max.(0,c - c_hat)
 
-c_hat = zeros(Nx + 1)
-d = zeros(Nx + 1)
+# c_hat = zeros(Nx + 1)
+# d = zeros(Nx + 1)
 
-for i = 1:Nx + 1
-    if c[i] >= 1/2
-       d[i] = c[i];
-       c_hat[i] = 0;
-    elseif c[i] < 1/2
-       c_hat[i] = c[i]
-       d[i] = 0;
-    end
-end
+# for i = 1:Nx + 1
+#     if c[i] >= 1/2
+#        d[i] = c[i];
+#        c_hat[i] = 0;
+#     elseif c[i] < 1/2
+#        c_hat[i] = c[i]
+#        d[i] = 0;
+#     end
+# end
 
 
 phi = zeros(Nx + 1, Ntau + 1);
@@ -165,12 +165,12 @@ for n = 1:Ntau
             r_upwind_n = phi[i - 1, n + 1] - phi[i, n] - phi[i - 1, n] + phi_old[i];
 
             # WENO SHU
-            U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
-            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
+            U = ω0 * ( 1 / ( ϵ + r_upwind_i^2 )^2 );
+            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i^2 )^2 );
             ω[i] = U / ( U + D );
 
-            U = α0 * ( 1 / ( ϵ + r_upwind_n )^2 );
-            D = ( 1 - α0 ) * ( 1 / ( ϵ + r_downwind_n )^2 );
+            U = α0 * ( 1 / ( ϵ + r_upwind_n^2 )^2 );
+            D = ( 1 - α0 ) * ( 1 / ( ϵ + r_downwind_n^2 )^2 );
             α[i] = U / ( U + D );
 
             # Space - Time limiter

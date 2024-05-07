@@ -116,8 +116,8 @@ for n = 1:Ntau
             r_upwind_i = phi[i, n] - phi[i - 1, n + 1] - phi[i - 1, n] + phi_left;
 
             # WENO SHU
-            U = ω0 * ( 1 / ( ϵ + r_upwind_i )^2 );
-            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i )^2 );
+            U = ω0 * ( 1 / ( ϵ + r_upwind_i^2 )^2 );
+            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i^2 )^2 );
             ω[i] = U / ( U + D );
 
             # Space-Time limiter

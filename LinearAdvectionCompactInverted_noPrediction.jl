@@ -112,8 +112,8 @@ for i = 2:1:Nx+1
             r_upwind = - phi[i - 1, n] + phi_old + phi[i - 1, n + 1] - phi[i, n];
 
             # WENO SHU
-            U = ω0 * ( 1 / ( ϵ + r_upwind )^2 );
-            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind )^2 );
+            U = ω0 * ( 1 / ( ϵ + r_upwind^2 )^2 );
+            D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind^2 )^2 );
             ω[n] = U / ( U + D );
 
             # Space - Time limiter

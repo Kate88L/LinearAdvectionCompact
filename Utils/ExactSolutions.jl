@@ -15,3 +15,12 @@ function cosVelocityNonSmooth(x, t)
     return (2 * asin(cos(2 * atan(sqrt(7) * tan((1/8) * sqrt(7) * (t - (8 * atan(tan(x/2) / sqrt(7))) / sqrt(7))))))) / π
 
 end
+
+# Function derivative
+function phi_derivative_x(phi, x, t)
+    return ForwardDiff.derivative(x -> phi(x, t), x)
+end
+
+function phi_derivative_t(phi, x, t)
+    return ForwardDiff.derivative(t -> phi(x, t), t)
+end

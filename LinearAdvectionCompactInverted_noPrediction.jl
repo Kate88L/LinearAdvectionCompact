@@ -4,6 +4,8 @@ using LinearAlgebra
 using PlotlyJS
 using CSV
 using DataFrames
+using Statistics
+using ForwardDiff
 
 include("Utils/InitialFunctions.jl")
 include("Utils/ExactSolutions.jl")
@@ -11,7 +13,7 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0
+level = 4
 # Courant number
 C = 3;
 
@@ -35,6 +37,9 @@ phi_0(x) = makePeriodic(nonSmooth,-1,1)(x - 0.5);
 
 # Exact solution
 phi_exact(x, t) = phi_0(x - t);
+
+# Exact solution derivative
+phi_exact_derivative(x, t) = phi_derivative_x(phi_exact, x, t);
 
 ## Comptutation
 x = range(xL, xR, length = Nx + 1)
@@ -145,18 +150,50 @@ end
 # df = CSV.File("phi_normal.csv") |> DataFrame
 # phi_1 = Matrix(df)
 
+# Compute TVD property of the derivative
+phi_d = zeros(Nx + 1, Ntau + 1)
+phi_dd = zeros(Nx + 1, Ntau + 1)
+TVD = zeros(Ntau + 1)
+for n = 1:Ntau + 1
+    phi_d[:, n] = [ ( phi[2, n] - phi[1,n] ) / h; [ ( phi[i+1,n] - phi[i-1,n] ) / (2*h) for i in 2:Nx ]  ;( phi[end, n] - phi[end-1, n] ) / h ];
+    phi_dd[:, n] = [ diff(phi_d[:, n]) / h ; ( phi_d[2, n] - phi_d[end, n] ) / h ]; 
+    TVD[n] = sum(abs.(phi_dd[:,n]));
+end
+
 # Print error
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
+# println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
+println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
+
 
 # Print first order error
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
 
-println("=============================")
+matrixM = zeros(Nx + 1, Ntau + 1)
+for n = 1:Ntau + 1
+    matrixM[:, n] = abs.(phi_d[:, n] - phi_exact_derivative.(x, (n-1)*tau));
+    for i = 1:Nx + 1
+        if isnan(matrixM[i, n])
+            matrixM[i, n] = 0;
+        end
+    end
+end
 
+# Compute T*h error for the solution derivative
+Error_t_h = tau * h * sum(abs(phi_d[i, n] - phi_exact_derivative(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1 if !isnan(phi_d[i, n]) && !isnan(phi_exact_derivative(x[i], (n-1)*tau)))
+MaxError = maximum(matrixM)
+max_indexes = argmax(matrixM)
+println("Error t*h derivative: ", Error_t_h)    
+println("Error L_inf derivative: ", MaxError)
+
+testPhi = phi_d[:, end]
+testPhiExact = phi_exact_derivative.(x, Ntau * tau)
+test = abs.(testPhi - testPhiExact)
+
+println("=============================")
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Inverted scheme", line=attr(color="firebrick", width=2))
@@ -170,8 +207,8 @@ plot_phi = plot([trace1, trace2], layout)
 plot_phi
 
 # Plot of the numerical derivative of the solution and the exact solution at the final time
-trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Inverted sol. gradient")
-trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
+trace1_d = scatter(x = x, y = phi_d[:, end], mode = "lines", name = "Inverted sol. gradient")
+trace2_d = scatter(x = x, y = phi_exact_derivative.(x, Ntau * tau), mode = "lines", name = "Exact sol. gradient")
 # trace3_d = scatter(x = x, y = diff(phi_1[:, end]) / h, mode = "lines", name = "classical sol. gradient")
 
 layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x")

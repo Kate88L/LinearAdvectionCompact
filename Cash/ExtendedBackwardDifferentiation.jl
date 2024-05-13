@@ -10,7 +10,6 @@ include("../Utils/Solvers.jl")
 @time begin
 ## Level of refinement
 level = 3
-
 order_x = 2
 
 ## Courant number

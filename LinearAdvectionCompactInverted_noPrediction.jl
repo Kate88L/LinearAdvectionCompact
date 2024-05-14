@@ -13,7 +13,7 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4
+level = 6
 # Courant number
 C = 3;
 
@@ -172,13 +172,17 @@ println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) fo
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
 println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
 
-matrixM = zeros(Nx + 1, Ntau + 1)
-for n = 1:Ntau + 1
-    matrixM[:, n] = abs.(phi_d[:, n] - phi_exact_derivative.(x, (n-1)*tau));
-    for i = 1:Nx + 1
-        if isnan(matrixM[i, n])
-            matrixM[i, n] = 0;
-        end
+matrixM = zeros(Nx + 1, 1)
+matrixM[:] = abs.(phi_d[:, end] - phi_exact_derivative.(x, Ntau*tau));
+for i = 1:Nx + 1
+    if isnan(matrixM[i])
+        matrixM[i] = 0;
+    end
+    if (abs(x[i] - 0.5) < (2 * 0.02) || 
+       abs(x[i] + 0.5) < (2 * 0.02) ||
+       abs(x[i] + 0.83) < (2 * 0.02) ||
+       abs(x[i] + 0.16) < (2 * 0.02) )
+        matrixM[i] = 0;
     end
 end
 

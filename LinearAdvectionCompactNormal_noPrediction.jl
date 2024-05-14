@@ -12,7 +12,7 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
+level = 6;
 
 # Courant number
 C = 3
@@ -173,8 +173,8 @@ for n = 1:Ntau + 1
     TVD[n] = sum(abs.(phi_dd[:,n]));
 end
 
-df = CSV.File("phi.csv") |> DataFrame
-phi_1 = Matrix(df)
+# df = CSV.File("phi.csv") |> DataFrame
+# phi_1 = Matrix(df)
 
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
@@ -183,13 +183,17 @@ println("Error L2: ", norm(phi[:,end] - phi_exact.(x, (Ntau) * tau), 2) * h)
 println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
 
 
-matrixM = zeros(Nx + 1, Ntau + 1)
-for n = 1:Ntau + 1
-    matrixM[:, n] = abs.(phi_d[:, n] - phi_exact_derivative.(x, (n-1)*tau));
-    for i = 1:Nx + 1
-        if isnan(matrixM[i, n])
-            matrixM[i, n] = 0;
-        end
+matrixM = zeros(Nx + 1, 1)
+matrixM[:] = abs.(phi_d[:, end] - phi_exact_derivative.(x, Ntau*tau));
+for i = 1:Nx + 1
+    if isnan(matrixM[i])
+        matrixM[i] = 0;
+    end
+    if (abs(x[i] - 0.5) < (2 * 0.02) || 
+       abs(x[i] + 0.5) < (2 * 0.02) ||
+       abs(x[i] + 0.83) < (2 * 0.02) ||
+       abs(x[i] + 0.16) < (2 * 0.02) )
+        matrixM[i] = 0;
     end
 end
 
@@ -211,7 +215,7 @@ println("Error t*h derivative: ", Error_t_h)
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Normal scheme", line=attr(color="firebrick", width=2))
 trace2 = scatter(x = x, y = phi_exact.(x, Ntau * tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
-trace3 = scatter(x = x, y = phi_1[:, end], mode = "lines", name = "Inverted scheme", line=attr(color="royalblue", width=2))
+# trace3 = scatter(x = x, y = phi_1[:, end], mode = "lines", name = "Inverted scheme", line=attr(color="royalblue", width=2))
 trace4 = scatter(x = x, y = phi_first_order[:, end], mode = "lines", name = "First order", line=attr(color="green", width=2))
 
 layout = Layout(plot_bgcolor="white", 
@@ -223,7 +227,7 @@ plot_phi
 # Plot of the numerical derivative of the solution and the exact solution at the final time
 trace1_d = scatter(x = x, y = phi_d[:, end], mode = "lines", name = "Normal sol. gradient")
 trace2_d = scatter(x = x, y = phi_exact_derivative.(x, Ntau * tau), mode = "lines", name = "Exact sol. gradient")
-trace3_d = scatter(x = x, y = diff(phi_1[:, end]) / h, mode = "lines", name = "Inverted sol. gradient")
+# trace3_d = scatter(x = x, y = diff(phi_1[:, end]) / h, mode = "lines", name = "Inverted sol. gradient")
 trace4_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
 
 layout_d = Layout(plot_bgcolor="white", 
@@ -232,10 +236,10 @@ xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)),
 plod_d_phi = plot([trace1_d, trace2_d], layout_d)
 
 # Plot TVD
-trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
-trace_tvd_1 = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD_1, mode = "lines", name = "TVD first order", line=attr(color="royalblue", width=2))
-layout_tvd = Layout(title = "TVD")
-plot_tvd = plot([trace_tvd; trace_tvd_1], layout_tvd)
+# trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
+# trace_tvd_1 = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD_1, mode = "lines", name = "TVD first order", line=attr(color="royalblue", width=2))
+# layout_tvd = Layout(title = "TVD")
+# plot_tvd = plot([trace_tvd; trace_tvd_1], layout_tvd)
 
 
 p = [plot_phi; plod_d_phi]

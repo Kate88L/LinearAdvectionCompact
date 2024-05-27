@@ -67,3 +67,12 @@ end
 function makePeriodic(f, xL, xR)
     return x -> f(mod(x - xL, xR - xL) + xL)
 end
+
+# Initial condition for Burgers' equation
+function trafficJam(x)
+    if abs(x + 0.2) > 0.2
+        return  sign(x + 0.2) * 0.2
+    else
+        return x + 0.2
+    end
+end

@@ -27,27 +27,30 @@ end
 
 function exactLozanoAslam(x, t)
     if ( t < 0.5 )
-        if 0.3 - 0.2 * t <= x <= 0.3 + t
+        if 0.3 - 0.0 * t <= x <= 0.3 + t
             return  (x - 0.3) / t
-        elseif 0.3 + t <= x <= 0.6 + 0.4 * t
+        elseif 0.3 + t < x <= 0.6 + 0.5 * t
             return 1
         else
-            return -0.2
+            return 0.0
         end
     else 
-        if 0.3 - 0.2 * t <= x <= 0.3 - 0.2 * t + 0.6 * sqrt(2*t)
+        if 0.3 - 0.0 * t <= x <= 0.3 - 0.0 * t + 0.6 * sqrt(2*t)
             return (x - 0.3) / t
         else
-            return -0.2
+            return 0.0
         end
     end
 end
 
-function integrate_function(f, a, b, N)
-    x_vals = range(a, stop=b, length=N)
+function integrate_function(f, a, b)
+    N = Int(1e3);
     integral_values = zeros(N)
+    x_vals = a:(b-a)/(N-1):b
+
     for i in 1:N
-        integral_values[i], _ = quadgk(f, a, x_vals[i])
+        integral_values[i] = trapz(x_vals[1:i], f.(x_vals[1:i]))
     end
-    return integral_values
+
+    return LinearInterpolation(x_vals, integral_values)
 end

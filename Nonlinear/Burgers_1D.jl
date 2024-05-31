@@ -3,6 +3,9 @@
 using NLsolve
 using LinearAlgebra
 using PlotlyJS
+using QuadGK
+using Trapz
+using Interpolations
 
 include("../Utils/InitialFunctions.jl")
 include("../Utils/ExactSolutions.jl")
@@ -14,22 +17,22 @@ include("../Utils/ExactSolutions.jl")
 H(x) = ( x.^2 ) / 2.0
 
 # Mesh
-xL = -1
+xL = 0
 xR = 1
 
-level = 0 # Level of refinement
+level = 1 # Level of refinement
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 x = range(xL, xR, length = Nx + 1)
 
 # Initial condition
-# F = integrate_function(simpleBurgers, xL, xR, Nx+1)
-phi_0(x) = simpleBurgers(x)
-# phi_0(x) = F(x)
+F = integrate_function(burgersLozanoAslam, xL, xR)
+# phi_0(x) = simpleBurgers(x)
+phi_0(x) = F(x)
 
 # Time
-T = 1
+T = 0.25
 Nτ = 10 * 2^level
 τ = T / Nτ
 
@@ -50,11 +53,23 @@ phi_first_order[:, 1] = phi_0.(x)
 # phi_first_order[:, 1] = F[:]
 # phi_predictor[:, 1] = F[:]
 
-ω = zeros(Nx + 1) .+ 1;
-
+ω = zeros(Nx + 1) .+ 1/3;
 
 # Compute the exact solution using the method of characteristics
 phi_exact = zeros(Nx + 1, Nτ + 1)
+for n = 1:Nτ + 1
+    function exactLozanoAslam_t(x)
+        return exactLozanoAslam(x, (n-1) * τ)
+    end
+    phi_e = integrate_function(exactLozanoAslam_t, xL, xR)
+    phi_exact[:, n] = phi_e(x)
+end
+
+function exactLozanoAslam_t(x)
+    return exactLozanoAslam(x, -τ)
+end
+phi_e = integrate_function(exactLozanoAslam_t, xL, xR)
+phi_old = phi_e(x)
 
 # Time loop
 for n = 1:Nτ
@@ -65,10 +80,8 @@ for n = 1:Nτ
     phi_predictor[1, n + 1] = phi_predictor[1, n]
     phi_predictor_n2[1, n + 1] = phi_predictor_n2[1, n]
 
-    if n == 1
-        phi_old = phi[:, n]
-    else
-        phi_old = phi[:, n - 1]
+    if n > 1
+        global phi_old = phi[:, n - 1]
     end
 
     for i = 2:Nx + 1
@@ -88,9 +101,6 @@ for n = 1:Nτ
 
         r_downwind_n = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
         r_upwind_n = phi[i - 1, n] + phi[i - 1, n + 1] - phi[i, n] - phi_old[i];
-
-        # print (r_downwind_n, " ", r_upwind_n, "\n")
-        # println(r_downwind_n)
 
         # Second order scheme
         function secondOrderScheme(S, x)
@@ -122,13 +132,14 @@ end
 ∂x_phi_exact = zeros(Nx + 1, Nτ + 1)
 
 for n = 1:Nτ + 1
+
+    ∂x_phi_exact[:, n] = exactLozanoAslam.(x, (n-1) * τ)
+
     ∂x_phi[1, n] = (phi[2, n] - phi[1, n]) / h
     ∂x_phi_first_order[1, n] = (phi_first_order[2, n] - phi_first_order[1, n]) / h
-    ∂x_phi_exact[1, n] = (phi_exact[2, n] - phi_exact[1, n]) / h
     for i = 2:Nx + 1
         ∂x_phi[i, n] = (phi[i, n] - phi[i - 1, n]) / h
         ∂x_phi_first_order[i, n] = (phi_first_order[i, n] - phi_first_order[i - 1, n]) / h
-        ∂x_phi_exact[i, n] = (phi_exact[i, n] - phi_exact[i - 1, n]) / h
     end
 end
 

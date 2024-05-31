@@ -73,7 +73,7 @@ function burgersLozanoAslam(x)
     if 0.3 <= x <= 0.6
         return  1
     else
-        return - 0.2
+        return 0.0
     end
 end
 

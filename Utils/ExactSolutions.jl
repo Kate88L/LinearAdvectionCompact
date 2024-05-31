@@ -24,3 +24,30 @@ end
 function phi_derivative_t(phi, x, t)
     return ForwardDiff.derivative(t -> phi(x, t), t)
 end
+
+function exactLozanoAslam(x, t)
+    if ( t < 0.5 )
+        if 0.3 - 0.2 * t <= x <= 0.3 + t
+            return  (x - 0.3) / t
+        elseif 0.3 + t <= x <= 0.6 + 0.4 * t
+            return 1
+        else
+            return -0.2
+        end
+    else 
+        if 0.3 - 0.2 * t <= x <= 0.3 - 0.2 * t + 0.6 * sqrt(2*t)
+            return (x - 0.3) / t
+        else
+            return -0.2
+        end
+    end
+end
+
+function integrate_function(f, a, b, N)
+    x_vals = range(a, stop=b, length=N)
+    integral_values = zeros(N)
+    for i in 1:N
+        integral_values[i], _ = quadgk(f, a, x_vals[i])
+    end
+    return integral_values
+end

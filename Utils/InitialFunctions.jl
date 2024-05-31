@@ -69,10 +69,18 @@ function makePeriodic(f, xL, xR)
 end
 
 # Initial condition for Burgers' equation
-function trafficJam(x)
-    if abs(x + 0.2) > 0.2
-        return  sign(x + 0.2) * 0.2
+function burgersLozanoAslam(x)
+    if 0.3 <= x <= 0.6
+        return  1
     else
-        return x + 0.2
+        return - 0.2
+    end
+end
+
+function simpleBurgers(x)
+    if abs(x + 0.2) >= 0.2
+        return 0 + sign(x + 0.2) * 0.2
+     else
+        return 1 * x + 0.2
     end
 end

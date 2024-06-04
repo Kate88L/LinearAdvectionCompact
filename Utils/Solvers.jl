@@ -48,11 +48,14 @@ function thomasAlgorithm(A, d)
     return x
 end
 
-# # test
-# A = [2. 2. 0. 0. 0.; 2. 3. 4. 0. 0.; 1. 4. 5. 2. 0.; 0. 1. 2. 3. 4.; 0. 0. 1. 2. 3.]
-# d = [1., 2., 3., 4., 5.]
-
-# x = modifiedThomasAlgorithm(A, d)
-# x_e = A \ d
-# println(x)
-# println(x_e)
+# Newton's method
+function newtonMethod(f, df, x0, tol=1e-6, max_iter=100)
+    x = x0
+    for i = 1:max_iter
+        x = x - f(x) / df(x)
+        if abs(f(x)) < tol
+            break
+        end
+    end
+    return x
+end

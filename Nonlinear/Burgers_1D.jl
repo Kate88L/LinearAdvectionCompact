@@ -20,7 +20,7 @@ H(x) = ( x.^2 ) / 2.0
 xL = 0
 xR = 1
 
-level = 1 # Level of refinement
+level = 0 # Level of refinement
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -54,6 +54,7 @@ phi_first_order[:, 1] = phi_0.(x)
 # phi_predictor[:, 1] = F[:]
 
 ω = zeros(Nx + 1) .+ 1/3;
+ϵ = 1e-16;
 
 # Compute the exact solution using the method of characteristics
 phi_exact = zeros(Nx + 1, Nτ + 1)
@@ -61,7 +62,7 @@ for n = 1:Nτ + 1
     function exactLozanoAslam_t(x)
         return exactLozanoAslam(x, (n-1) * τ)
     end
-    phi_e = integrate_function(exactLozanoAslam_t, xL, xR)
+    local phi_e = integrate_function(exactLozanoAslam_t, xL, xR)
     phi_exact[:, n] = phi_e(x)
 end
 
@@ -104,7 +105,16 @@ for n = 1:Nτ
 
         # Second order scheme
         function secondOrderScheme(S, x)
-            S[1] = x[1] - phi[i, n] + τ * H( (x[1] - phi[i - 1, n + 1]) / h  +  ω[i] * r_upwind_n +  (1 - ω[i]) * r_downwind_n )
+            # dx = (x[1] - phi[i - 1, n + 1]) / h  +  ω[i] * r_upwind_n +  (1 - ω[i]) * r_downwind_n;
+            dx = (x[1] - phi[i - 1, n + 1]) / h; # first order 
+            # dx = dx - 0.5 * ( x[1] - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / τ / (dx + ϵ); # second order update
+            # S[1] = x[1] - phi[i, n] + τ * H( dx )
+            S[1] = x[1] - phi[i, n] + τ * H(dx) - τ^2 / 2 * dx * (x[1] - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / (h * τ) 
+        end
+
+        function secondOrderScheme2(x)
+            dx = (x - phi[i - 1, n + 1]) / h; # first order 
+            return x - phi[i, n] + τ * H(dx) - τ^2 / 2 * dx * (x - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / (h * τ) 
         end
 
         # First order solution
@@ -112,8 +122,9 @@ for n = 1:Nτ
         phi_first_order[i, n + 1] = solution.zero[1];
 
         # Second order solution
-        solution = nlsolve(secondOrderScheme, [phi[i, n]])
-        phi[i, n + 1] = solution.zero[1];
+        # solution = nlsolve(secondOrderScheme, [phi[i, n]])
+        # phi[i, n + 1] = solution.zero[1];
+        phi[i, n + 1] = newtonMethod(secondOrderScheme2, x -> (secondOrderScheme2(x + ϵ)- secondOrderScheme2(x))/ϵ, phi[i, n])
 
         # Predictor
         function firstOrderPredictorFuture(S, u)
@@ -125,6 +136,11 @@ for n = 1:Nτ
     end
 
 end
+
+## Compute and print the error
+println("Error L2 first order scheme: ", norm(phi_first_order[:,end] - phi_exact[:, end], 2) * h)
+println("Error L2 final scheme: ", norm(phi[:,end] - phi_exact[:, end], 2) * h)
+
 
 ## Compute the numerical derivative of the solution
 ∂x_phi_first_order = zeros(Nx + 1, Nτ + 1)

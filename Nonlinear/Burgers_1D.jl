@@ -21,7 +21,7 @@ H(x) = ( x.^2 ) / 2.0
 xL = 0
 xR = 1
 
-level = 0 # Level of refinement
+level = 4 # Level of refinement
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -129,7 +129,7 @@ for n = 1:Nτ
         u = ( phi_predictor_general[i, n + 1] - phi_predictor_general[i - 1, n + 1] ) / h / 2;
 
         c[i] = u * τ / h;
-        c_hat[i] = min(c[i], 1/2);
+        c_hat[i] = min(c[i], 1);
         d[i] = max(0, c[i] - c_hat[i]);
 
         if (c[i] == 0) 
@@ -192,6 +192,8 @@ for n = 1:Nτ
         # Predictor for next time step
         phi_predictor_n2[i, n + 1] =  ( phi[i, n + 1] + c[i] * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + c[i] );
 
+        phi_predictor_general[i, n + 1] = phi[i, n + 1];
+
     end
 
 end
@@ -199,6 +201,8 @@ end
 ## Compute and print the error
 println("Error L2 first order scheme: ", norm(phi_first_order[:,end] - phi_exact[2:end-1, end-1], 2) * h)
 println("Error L2 final scheme: ", norm(phi[:,end] - phi_exact[2:end-1, end-1], 2) * h)
+Error_t_h = τ * h * sum(abs(phi[i, n] - phi_exact[i+1, n+1]) for n in 1:Nτ+1 for i in 1:Nx+1)
+println("Error t*h: ", Error_t_h)
 
 
 ## Compute the numerical derivative of the solution

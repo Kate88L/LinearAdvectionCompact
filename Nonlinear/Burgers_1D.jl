@@ -21,7 +21,7 @@ H(x) = ( x.^2 ) / 2.0
 xL = 0
 xR = 1
 
-level = 2 # Level of refinement
+level = 0 # Level of refinement
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -129,7 +129,7 @@ for n = 1:Nτ
         u = ( phi_predictor_general[i, n + 1] - phi_predictor_general[i - 1, n + 1] ) / h / 2;
 
         c[i] = u * τ / h;
-        c_hat[i] = min(c[i], 1);
+        c_hat[i] = min(c[i], 1/2);
         d[i] = max(0, c[i] - c_hat[i]);
 
         if (c[i] == 0) 
@@ -161,13 +161,26 @@ for n = 1:Nτ
         r_upwind_n = phi[i - 1, n + 1] - phi[i, n] - phi[i - 1, n] + phi_old[i];
 
         # WENO SHU
-        U = ω0 * ( 1 / ( ϵ + r_upwind_i^2 )^2 );
-        D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i^2 )^2 );
-        ω[i] = U / ( U + D );
+        # U = ω0 * ( 1 / ( ϵ + r_upwind_i^2 )^2 );
+        # D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i^2 )^2 );
+        # ω[i] = U / ( U + D );
 
-        U = α0 * ( 1 / ( ϵ + r_upwind_n^2 )^2 );
-        D = ( 1 - α0 ) * ( 1 / ( ϵ + r_downwind_n^2 )^2 );
-        α[i] = U / ( U + D );
+        # U = α0 * ( 1 / ( ϵ + r_upwind_n^2 )^2 );
+        # D = ( 1 - α0 ) * ( 1 / ( ϵ + r_downwind_n^2 )^2 );
+        # α[i] = U / ( U + D );
+
+        # ENO
+        if (abs(r_downwind_i) + ϵ) < (abs(r_upwind_i) + ϵ)
+            ω[i] = 0;
+        else
+            ω[i] = 1;
+        end
+
+        if (abs(r_downwind_n) + ϵ) < (abs(r_upwind_n) + ϵ)
+            α[i] = 0;
+        else
+            α[i] = 1;
+        end
 
         velocity_der = d[i] / c[i] * ( ( 0.5 / c[i] ) * (c[i] - c[i-1]) ); 
 

@@ -51,12 +51,8 @@ end
 # Newton's method
 function newtonMethod(f, df, x0, tol=1e-14, max_iter=100)
     x = x0
-    println("x0 = ", x0)
     for i = 1:max_iter
         δ_x = -f(x) / (df(x) + 1e-16)
-        println("δ_x = ", δ_x)
-        println("f(x) = ", f(x))
-        println("df(x) = ", df(x))
         if isnan(δ_x)
             break
         end

@@ -9,6 +9,7 @@ using Interpolations
 
 include("../Utils/InitialFunctions.jl")
 include("../Utils/ExactSolutions.jl")
+include("../Utils/Solvers.jl")
 
 
 ## Definition of basic parameters
@@ -21,7 +22,7 @@ xL = 0
 xR = 1
 
 level = 0 # Level of refinement
-Nx = 100 * 2^level
+Nx = 10 * 2^level
 h = (xR - xL) / Nx
 
 x = range(xL, xR, length = Nx + 1)
@@ -39,100 +40,107 @@ Nτ = 10 * 2^level
 # Nτ = 1
 
 ## Comptutation
-phi = zeros(Nx + 1, Nτ + 1)
-phi_first_order = zeros(Nx + 1, Nτ + 1)
-phi_predictor = zeros(Nx + 1, Nτ + 1)
-phi_predictor_n2 = zeros(Nx + 1, Nτ + 1)
+phi = zeros(Nx + 1, Nτ + 1);
+phi_predictor_i = zeros(Nx + 1, Nτ + 1); # predictor in time n+1
+phi_predictor_n = zeros(Nx + 1, Nτ + 1); # predictor in time n
+phi_predictor_n2 = zeros(Nx + 1, Nτ + 1); # predictor in time n+2
+phi_first_order = zeros(Nx + 1, Nτ + 1);
 
 # Initial condition
-phi[:, 1] = phi_0.(x)
-phi_predictor[:, 1] = phi_0.(x)
-phi_first_order[:, 1] = phi_0.(x)
-
-# phi[:, 1] = F[:]
-# phi_first_order[:, 1] = F[:]
-# phi_predictor[:, 1] = F[:]
-
-ω = zeros(Nx + 1) .+ 1/3;
-ϵ = 1e-16;
+phi[:, 1] = phi_0.(x);
+phi_predictor_i[:, 1] = phi_0.(x);
+phi_predictor_n[:, 1] = phi_0.(x);
+phi_predictor_n2[:, 1] = phi_0.(x);
+phi_first_order[:, 1] = phi_0.(x);
 
 # Compute the exact solution using the method of characteristics
-phi_exact = zeros(Nx + 1, Nτ + 1)
-for n = 1:Nτ + 1
+phi_exact = zeros(Nx + 3, Nτ + 3)
+x_map = range(xL - h, xR + h, length = Nx + 3)
+for n = 1:Nτ + 3
     function exactLozanoAslam_t(x)
-        return exactLozanoAslam(x, (n-1) * τ)
+        return exactLozanoAslam(x, (n-2) * τ)
     end
-    local phi_e = integrate_function(exactLozanoAslam_t, xL, xR)
-    phi_exact[:, n] = phi_e(x)
+    local phi_e = integrate_function(exactLozanoAslam_t, xL - h, xR + h)
+    phi_exact[:, n] = phi_e(x_map)
 end
 
-function exactLozanoAslam_t(x)
-    return exactLozanoAslam(x, -τ)
-end
-phi_e = integrate_function(exactLozanoAslam_t, xL, xR)
-phi_old = phi_e(x)
+phi[1, :] = phi_exact[2, 2:end-1];
+phi_predictor_i[1, :] = phi_exact[2, 2:end-1];
+phi_predictor_n[1, :] = phi_exact[2, 2:end-1];
+phi_first_order[1, :] = phi_exact[2, 2:end-1];
+phi_predictor_n2[1, :] = phi_exact[2, 3:end];
+
+phi[end, :] = phi_exact[end - 1, 2:end-1];
+phi_predictor_i[end, :] = phi_exact[end - 1, 2:end-1];
+phi_predictor_n[end, :] = phi_exact[end - 1, 2:end-1];
+phi_first_order[end, :] = phi_exact[end - 1, 2:end-1];
+phi_predictor_n2[end, :] = phi_exact[end - 1, 3:end];
+
+# Ghost point on the right side 
+ghost_point_right = phi_exact[end, 3:end-1]
+# Ghost point on the left side 
+ghost_point_left = phi_exact[1, 3:end-1]
+# Ghost point on the time -1
+ghost_point_time = phi_exact[2:end-1, 1]
+
+# WENO parameters
+ϵ = 1e-16;
+ω0 = 1/3;
+α0 = 1/3;
 
 # Time loop
 for n = 1:Nτ
 
     # Boundary conditions
-    phi[1, n + 1] = phi[1, n]
-    phi_first_order[1, n + 1] = phi_first_order[1, n]
-    phi_predictor[1, n + 1] = phi_predictor[1, n]
-    phi_predictor_n2[1, n + 1] = phi_predictor_n2[1, n]
-
     if n > 1
-        global phi_old = phi[:, n - 1]
+        phi_old = phi[:, n-1];
+    else
+        phi_old = ghost_point_time;
     end
 
     for i = 2:Nx + 1
         # First order scheme
-        function firstOrderScheme(S, u)
-            S[1] = u[1] - phi_first_order[i, n] + τ * H( (u[1] - phi_first_order[i - 1, n + 1]) / h )
+        function firstOrderScheme(u)
+            return u - phi_first_order[i, n] + τ * H( (u - phi_first_order[i - 1, n + 1]) / h )
         end
 
         # Predictor
-        function firstOrderPredictor(S, u)
-            S[1] = u[1] - phi[i, n] + τ * H( (u[1] - phi_predictor[i - 1, n + 1]) / h )
+        function firstOrderPredictor(u)
+            return u - phi[i, n] + τ * H( (u - phi_predictor[i - 1, n + 1]) / h )
         end
 
-        prediction = nlsolve(firstOrderScheme, [phi_predictor[i, n]]);
-        phi_predictor[i, n + 1] = prediction.zero[1];
+        # prediction = nlsolve(firstOrderScheme, [phi_predictor[i, n]]);
+        # phi_predictor[i, n + 1] = prediction.zero[1];
+        phi_predictor[i, n + 1] = newtonMethod(firstOrderPredictor, x -> (firstOrderPredictor(x + ϵ) - firstOrderPredictor(x)) / ϵ, phi_predictor[i, n])
         phi_predictor_n2[i, n] = phi_predictor[i, n + 1];
 
         r_downwind_n = phi_predictor[i, n] - phi_predictor[i - 1, n + 1] - phi_predictor[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
         r_upwind_n = phi[i - 1, n] + phi[i - 1, n + 1] - phi[i, n] - phi_old[i];
 
         # Second order scheme
-        function secondOrderScheme(S, x)
-            # dx = (x[1] - phi[i - 1, n + 1]) / h  +  ω[i] * r_upwind_n +  (1 - ω[i]) * r_downwind_n;
-            dx = (x[1] - phi[i - 1, n + 1]) / h; # first order 
-            # dx = dx - 0.5 * ( x[1] - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / τ / (dx + ϵ); # second order update
-            # S[1] = x[1] - phi[i, n] + τ * H( dx )
-            S[1] = x[1] - phi[i, n] + τ * H(dx) - τ^2 / 2 * dx * (x[1] - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / (h * τ) 
+        function secondOrderScheme(u)
+            du = (u - phi[i - 1, n + 1]) / h; # first order 
+            du = du - 0.5 * ( u - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / τ / (du + ϵ); # second order update
+            return u - phi[i, n] + τ * H( du )
         end
 
-        function secondOrderScheme2(x)
-            dx = (x - phi[i - 1, n + 1]) / h; # first order 
-            return x - phi[i, n] + τ * H(dx) - τ^2 / 2 * dx * (x - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / (h * τ) 
+        function secondOrderScheme2(u)
+            du = (u - phi[i - 1, n + 1]) / h; # first order 
+            return u - phi[i, n] + τ * H(du) - τ^2 / 2 * du * (u - phi[i - 1, n + 1] - phi[i, n] + phi[i - 1, n] ) / (h * τ) 
         end
 
         # First order solution
-        solution = nlsolve(firstOrderScheme, [phi_first_order[i, n]]) 
-        phi_first_order[i, n + 1] = solution.zero[1];
+        phi_first_order[i, n + 1] = newtonMethod(firstOrderScheme, x -> (firstOrderScheme(x + ϵ) - firstOrderScheme(x)) / ϵ, phi_first_order[i, n])
 
         # Second order solution
-        # solution = nlsolve(secondOrderScheme, [phi[i, n]])
-        # phi[i, n + 1] = solution.zero[1];
-        phi[i, n + 1] = newtonMethod(secondOrderScheme2, x -> (secondOrderScheme2(x + ϵ)- secondOrderScheme2(x))/ϵ, phi[i, n])
+        phi[i, n + 1] = newtonMethod(secondOrderScheme, x -> (secondOrderScheme(x + ϵ) - secondOrderScheme(x)) / ϵ, phi[i, n])
 
         # Predictor
-        function firstOrderPredictorFuture(S, u)
-            S[1] = u[1] - phi[i, n + 1] + τ * H( (u[1] - phi_predictor_n2[i - 1, n + 1]) / h )
+        function firstOrderPredictorFuture(u)
+            return u - phi[i, n + 1] + τ * H( (u - phi_predictor_n2[i - 1, n + 1]) / h )
         end
 
-        prediction = nlsolve(firstOrderPredictorFuture, [phi_predictor_n2[i, n]]);
-        phi_predictor_n2[i, n + 1] = prediction.zero[1];
+        phi_predictor_n2[i, n + 1] = newtonMethod(firstOrderPredictorFuture, x -> (firstOrderPredictorFuture(x + ϵ) - firstOrderPredictorFuture(x)) / ϵ, phi_predictor_n2[i, n])
     end
 
 end

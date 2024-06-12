@@ -49,13 +49,22 @@ function thomasAlgorithm(A, d)
 end
 
 # Newton's method
-function newtonMethod(f, df, x0, tol=1e-6, max_iter=100)
+function newtonMethod(f, df, x0, tol=1e-14, max_iter=100)
     x = x0
+    println("x0 = ", x0)
     for i = 1:max_iter
-        x = x - f(x) / df(x)
-        if abs(f(x)) < tol
+        δ_x = -f(x) / (df(x) + 1e-16)
+        println("δ_x = ", δ_x)
+        println("f(x) = ", f(x))
+        println("df(x) = ", df(x))
+        if isnan(δ_x)
             break
         end
+        x_new = x + δ_x
+        if (x_new - x).^2 < tol
+            break
+        end
+        x = x_new
     end
     return x
 end

@@ -116,7 +116,7 @@ for n = 1:Nτ
         end
 
         phi_predictor_i[i, n + 1] = newtonMethod(firstOrderPredictor, x -> (firstOrderPredictor(x + ϵ) - firstOrderPredictor(x)) / ϵ, phi[i, n])
-        phi_predictor_n[i, n + 1] = newtonMethod(firstOrderPredictor_n, x -> (firstOrderPredictor_n(x + ϵ) - firstOrderPredictor_n(x)) / ϵ, phi[i, n])
+        phi_predictor_n[i, n + 1] = newtonMethod(firstOrderPredictor_n, x -> (firstOrderPredictor_n(x + ϵ) - firstOrderPredictor_n(x)) / ϵ, phi_predictor_n[i, n])
 
         if i < Nx + 1
             phi_right = phi[i + 1, n]
@@ -130,7 +130,8 @@ for n = 1:Nτ
             phi_left = ghost_point_left[n];
         end
 
-        phi_predictor_n2[i - 1, n + 1] = phi_exact[i, n+2]
+        # phi_predictor_n2[i - 1, n + 1] = phi_exact[i, n+2]
+        # phi_predictor_n[:, :] = phi_exact[2:end-1, 2:end-1]
 
         # Correction
         r_downwind_i = - phi[i, n] + phi_predictor_i[i - 1, n + 1] - phi_predictor_i[i, n + 1] + phi_right;
@@ -156,7 +157,7 @@ for n = 1:Nτ
         end
 
         if (abs(r_downwind_n) + ϵ) < (abs(r_upwind_n) + ϵ)
-            α[i] = 0;
+            α[i] = 1;
         else
             α[i] = 1;
         end
@@ -178,7 +179,7 @@ for n = 1:Nτ
 
             A = min(1, C);
             B = max(0, C - A);
-            second_order_term = second_order_term_i * A / C + second_order_term_n * B / C;
+            second_order_term = second_order_term_i * A * h / (τ * ∂x_phi) + second_order_term_n * B * h / (τ * ∂x_phi);
 
             return u - phi[i, n] + τ * H( first_order_term + second_order_term )
         end
@@ -240,6 +241,12 @@ trace3_d = scatter(x = x, y = ∂x_phi_first_order[:, end], mode = "lines", name
 
 plot_phi_d = plot([trace1_d, trace2_d, trace3_d], layout)
 
-p = [plot_phi; plot_phi_d]
+# plot of α
+trace1_α = scatter(x = x, y = α, mode = "lines", name = "α")
+
+plot_α = plot([trace1_α], layout)
+
+
+p = [plot_phi; plot_phi_d; plot_α]
 relayout!(p, width = 1000, height = 500)
 p

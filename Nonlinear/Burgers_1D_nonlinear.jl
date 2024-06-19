@@ -22,7 +22,7 @@ xL = -2
 xR = 2
 
 level = 0 # Level of refinement
-Nx = 10 * 2^level
+Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 x = range(xL, xR, length = Nx + 1)
@@ -35,11 +35,11 @@ x = range(xL, xR, length = Nx + 1)
 phi_0(x) = smoothBurgers(x)
 
 # Time
-T = 3 / 10
+T = 5 / 10
 Nτ = 10 * 2^level
 τ = T / Nτ
 
-Nτ = 1
+# Nτ = 1
 
 ## Comptutation
 phi = zeros(Nx + 1, Nτ + 1);
@@ -203,7 +203,7 @@ for n = 1:Nτ
             # A = min(100, C);
             # B = max(0, C - A);
             second_order_term = second_order_term_i # * A * h / (τ * ∂x_phi) + second_order_term_n * B * h / (τ * ∂x_phi);
-            println("second_order_term: ", second_order_term)
+            # println("second_order_term: ", second_order_term)
             return u - phi[i, n] + τ * H( first_order_term + second_order_term )
         end
 
@@ -249,7 +249,7 @@ end
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Second order scheme", line=attr(color="firebrick", width=2))
-trace2 = scatter(x = x, y = phi_exact[2:end-1,2], mode = "lines", name = "Exact solution", line=attr(color="royalblue", width=2))
+trace2 = scatter(x = x, y = phi_exact[2:end-1,end-1], mode = "lines", name = "Exact solution", line=attr(color="royalblue", width=2))
 trace3 = scatter(x = x, y = phi_first_order[:,end], mode = "lines", name = "First order scheme", line=attr(color="black", width=2))
 
 layout = Layout(plot_bgcolor="white", 

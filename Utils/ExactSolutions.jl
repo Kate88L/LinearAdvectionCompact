@@ -43,6 +43,19 @@ function exactLozanoAslam(x, t)
     end
 end
 
+# Exact solution for the derivative of the Burgers' equation for smooth initial condition
+function exactSmoothBurgersDerivative(x, t)
+    try
+        if abs.(1 - sqrt(1 + 4 * t * (t - x))) <= 2 * t
+            return 1 -  ( (1 - sqrt(1 + 4 * t * (t - x))).^2 ) / (4 * t.^2)
+        else
+            return 0.0
+        end
+    catch
+        return 0.0
+    end
+end
+
 function integrate_function(f, a, b)
     N = Int(1e3);
     integral_values = zeros(N)

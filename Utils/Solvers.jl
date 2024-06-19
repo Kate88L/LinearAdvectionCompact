@@ -49,10 +49,13 @@ function thomasAlgorithm(A, d)
 end
 
 # Newton's method
-function newtonMethod(f, df, x0, tol=1e-14, max_iter=100)
+function newtonMethod(f, df, x0, tol=1e-10, max_iter=100)
     x = x0
+    # println("Newton's method started")
+    # println("Initial guess: ", x)
     for i = 1:max_iter
         δ_x = -f(x) / (df(x) + 1e-16)
+        # println("Iteration: ", i, " x: ", x, " δ_x: ", δ_x)
         if isnan(δ_x)
             break
         end
@@ -61,6 +64,10 @@ function newtonMethod(f, df, x0, tol=1e-14, max_iter=100)
             break
         end
         x = x_new
+        # println("x_new: ", x_new)
+        if(i == max_iter)
+            println("Newton's method did not converge")
+        end
     end
     return x
 end

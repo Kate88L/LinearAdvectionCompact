@@ -18,22 +18,24 @@ include("../Utils/Solvers.jl")
 H(x) = ( x.^2 ) / 2.0
 
 # Mesh
-xL = 0
-xR = 1
+xL = -2
+xR = 2
 
-level = 1 # Level of refinement
-Nx = 100 * 2^level
+level = 0 # Level of refinement
+Nx = 10 * 2^level
 h = (xR - xL) / Nx
 
 x = range(xL, xR, length = Nx + 1)
 
 # Initial condition
-F = integrate_function(burgersLozanoAslam, xL, xR)
-# phi_0(x) = simpleBurgers(x)
-phi_0(x) = F(x)
+# F = integrate_function(burgersLozanoAslam, xL, xR)
+# F = integrate_function(smoothBurgers, xL, xR)
+# phi_0(x) = F(x)
+
+phi_0(x) = smoothBurgers(x)
 
 # Time
-T = 0.25
+T = 3 / 10
 Nτ = 10 * 2^level
 τ = T / Nτ
 
@@ -57,11 +59,18 @@ phi_first_order[:, 1] = phi_0.(x);
 phi_exact = zeros(Nx + 3, Nτ + 3)
 x_map = range(xL - h, xR + h, length = Nx + 3)
 for n = 1:Nτ + 3
-    function exactLozanoAslam_t(x)
-        return exactLozanoAslam(x, (n-2) * τ)
+    function exactBurgers(x)
+        # return exactLozanoAslam(x, (n-2) * τ)
+        return exactSmoothBurgersDerivative(x, (n-2) * τ)
     end
-    local phi_e = integrate_function(exactLozanoAslam_t, xL - h, xR + h)
-    phi_exact[:, n] = phi_e(x_map)
+    local phi_e = integrate_function(exactBurgers, xL - h, xR + h)
+    if n < 3
+        phi_exact[2:end-1, n] = phi_0.(x)
+        phi_exact[1, n] = phi_exact[2, n]
+        phi_exact[end, n] = phi_exact[end-1, n]
+    else
+        phi_exact[:, n] = phi_e.(x_map)
+    end
 end
 
 phi[1, :] = phi_exact[2, 2:end-1];
@@ -78,7 +87,7 @@ ghost_point_left = phi_exact[1, 3:end-1]
 ghost_point_time = phi_exact[2:end-1, 1]
 
 # WENO parameters
-ϵ = 1e-16;
+ϵ = 1e-14;
 ω0 = 1/3;
 α0 = 1/3;
 
@@ -103,6 +112,9 @@ for n = 1:Nτ
         function firstOrderScheme(u)
             return u - phi_first_order[i, n] + τ * H( (u - phi_first_order[i - 1, n + 1]) / h )
         end
+
+        # println("i: ", i, " n: ", n)
+        # println(firstOrderScheme(phi_first_order[i, n] + ϵ), " ", firstOrderScheme(phi_first_order[i, n]), " ", (firstOrderScheme(phi_first_order[i, n] + ϵ) - firstOrderScheme(phi_first_order[i, n])) / ϵ)
 
         phi_first_order[i, n + 1] = newtonMethod(firstOrderScheme, x -> (firstOrderScheme(x + ϵ) - firstOrderScheme(x)) / ϵ, phi_first_order[i, n])
 
@@ -153,34 +165,45 @@ for n = 1:Nτ
         if (abs(r_downwind_i) + ϵ) < (abs(r_upwind_i) + ϵ)
             ω[i] = 0;
         else
-            ω[i] = 1;
+            ω[i] = 0;
         end
 
         if (abs(r_downwind_n) + ϵ) < (abs(r_upwind_n) + ϵ)
-            α[i] = 1;
+            α[i] = 0;
         else
             α[i] = 1;
         end
 
         # Final scheme 
         function secondOrderScheme(u)
+
+            # grad_u = (phi_predictor_i[i, n + 1] - phi_predictor_i[i - 1, n + 1]) / h;
+            # c = grad_u * τ / h;
+            # c_hat = min(c, 1);
+            # d = max(0, c - c_hat);
+
+            # c_hat = c_hat / c;
+            # d = d / c;
+
+            # println("c: ", c, " c_hat: ", c_hat, " d: ", d)
+
             first_order_term = (u - phi[i - 1, n + 1]) / h;
             second_order_term_i = ( ( 1 - ω[i] ) * r_downwind_i + ω[i] * r_upwind_i ) / (2 * h);
             second_order_term_n = ( ( 1 - α[i] ) * r_downwind_n + α[i] * r_upwind_n ) / (2 * h);
 
             # Compute derivative of phi_predictor_i
-            ∂x_phi = i > 1 ? (phi_predictor_i[i, n] - phi_predictor_i[i - 1, n]) / h : (phi_predictor_i[i + 1, n] - phi_predictor_i[i, n]) / h;
+            # ∂x_phi = i > 1 ? (phi_predictor_i[i, n] - phi_predictor_i[i - 1, n]) / h : (phi_predictor_i[i + 1, n] - phi_predictor_i[i, n]) / h;
 
-            C = ∂x_phi * τ / h;
+            # C = ∂x_phi * τ / h;
 
             # if C > 1 
                 # println("CFL condition not satisfied for x[i] = ", x[i], " and t = ", n * τ)
             # end
 
-            A = min(1, C);
-            B = max(0, C - A);
-            second_order_term = second_order_term_i * A * h / (τ * ∂x_phi) + second_order_term_n * B * h / (τ * ∂x_phi);
-
+            # A = min(100, C);
+            # B = max(0, C - A);
+            second_order_term = second_order_term_i # * A * h / (τ * ∂x_phi) + second_order_term_n * B * h / (τ * ∂x_phi);
+            println("second_order_term: ", second_order_term)
             return u - phi[i, n] + τ * H( first_order_term + second_order_term )
         end
 
@@ -210,11 +233,13 @@ println("Error t*h: ", Error_t_h)
 
 for n = 1:Nτ + 1
 
-    ∂x_phi_exact[:, n] = exactLozanoAslam.(x, (n-1) * τ)
+    # ∂x_phi_exact[:, n] = exactLozanoAslam.(x, (n-1) * τ)
+    ∂x_phi_exact[1, n] = (phi_exact[3, n + 1] - phi_exact[2, n + 1]) / h;
 
     ∂x_phi[1, n] = (phi[2, n] - phi[1, n]) / h
     ∂x_phi_first_order[1, n] = (phi_first_order[2, n] - phi_first_order[1, n]) / h
     for i = 2:Nx + 1
+        ∂x_phi_exact[i, n] = (phi_exact[i+1, n + 1] - phi_exact[i, n + 1]) / h
         ∂x_phi[i, n] = (phi[i, n] - phi[i - 1, n]) / h
         ∂x_phi_first_order[i, n] = (phi_first_order[i, n] - phi_first_order[i - 1, n]) / h
     end
@@ -224,7 +249,7 @@ end
 
 # Plot of the result at the final time together with the exact solution
 trace1 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Second order scheme", line=attr(color="firebrick", width=2))
-trace2 = scatter(x = x, y = phi_exact[2:end-1,end-1], mode = "lines", name = "Exact solution", line=attr(color="royalblue", width=2))
+trace2 = scatter(x = x, y = phi_exact[2:end-1,2], mode = "lines", name = "Exact solution", line=attr(color="royalblue", width=2))
 trace3 = scatter(x = x, y = phi_first_order[:,end], mode = "lines", name = "First order scheme", line=attr(color="black", width=2))
 
 layout = Layout(plot_bgcolor="white", 
@@ -247,6 +272,6 @@ trace1_α = scatter(x = x, y = α, mode = "lines", name = "α")
 plot_α = plot([trace1_α], layout)
 
 
-p = [plot_phi; plot_phi_d; plot_α]
+p = [plot_phi; plot_phi_d]
 relayout!(p, width = 1000, height = 500)
 p

@@ -77,6 +77,18 @@ function burgersLozanoAslam(x)
     end
 end
 
+# Smooth burgers function
+function smoothBurgers(x)
+    if x <= -1
+        return 0.0
+    elseif -1 < x <= 1
+        return 2/3 + x - x.^3 / 3
+    else
+        return 4/3
+    end    
+    
+end
+
 function simpleBurgers(x)
     if abs(x + 0.2) >= 0.2
         return 0 + sign(x + 0.2) * 0.2

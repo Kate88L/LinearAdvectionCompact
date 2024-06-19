@@ -21,7 +21,7 @@ H(x) = ( x.^2 ) / 2.0
 xL = -2
 xR = 2
 
-level = 0 # Level of refinement
+level = 1 # Level of refinement
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 

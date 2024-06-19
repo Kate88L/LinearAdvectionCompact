@@ -49,7 +49,7 @@ function thomasAlgorithm(A, d)
 end
 
 # Newton's method
-function newtonMethod(f, df, x0, tol=1e-10, max_iter=100)
+function newtonMethod(f, df, x0, tol=1e-19, max_iter=100)
     x = x0
     # println("Newton's method started")
     # println("Initial guess: ", x)

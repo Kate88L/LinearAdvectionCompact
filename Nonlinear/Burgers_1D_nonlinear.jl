@@ -21,7 +21,7 @@ H(x) = ( x.^2 ) / 2.0
 xL = 0 # -2
 xR = 1 # 2
 
-level = 3 # Level of refinement
+level = 4 # Level of refinement
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -192,8 +192,8 @@ for n = 1:Nτ
             A = min(1, C) / C;
             B = max(0, C - A) / C;
 
-            A = C <= 1/2 ? 1 : 0;
-            B = C < 1/2 ? 0 : 1;
+            A = C <= 1 ? 1 : 0;
+            B = C < 1 ? 0 : 1;
 
             # println("second_order_term: ", second_order_term)
             return ( u - phi[i, n] ) / τ + B * second_order_term_n + H( first_order_term + A * second_order_term_i )

@@ -11,7 +11,7 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 0;
 
 # Level of correction
 p = 5;
@@ -54,7 +54,7 @@ tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
 
-Ntau = 1
+# Ntau = 1
 
 c = zeros(Nx+1) .+ u.(x) * tau / h
 
@@ -68,7 +68,6 @@ phi_first_order = zeros(Nx + 1, Ntau + 1);
 phi[:, 1] = phi_0.(x);
 phi_predictor_i[:, 1] = phi_0.(x);
 phi_predictor_n[:, 1] = phi_0.(x);
-phi_predictor_n2[:, 1] = phi_0.(x);
 phi_first_order[:, 1] = phi_0.(x);
 
 # Boundary conditions
@@ -78,17 +77,17 @@ phi_predictor_n[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1)
 phi_first_order[1, :] = phi_exact.(x[1], range(0, Ntau * tau, length = Ntau + 1));
 phi_predictor_n2[1, :] = phi_exact.(x[1], range(tau, (Ntau + 1) * tau, length = Ntau + 1));
 
-phi[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor_i[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor_n[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-phi_first_order[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
-phi_predictor_n2[end, :] = phi_exact.(x[end], range(tau, (Ntau + 1) * tau, length = Ntau + 1));
+# phi[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+# phi_predictor_i[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+# phi_predictor_n[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+# phi_first_order[end, :] = phi_exact.(x[end], range(0, Ntau * tau, length = Ntau + 1));
+# phi_predictor_n2[end, :] = phi_exact.(x[end], range(tau, (Ntau + 1) * tau, length = Ntau + 1));
 
 
 # Ghost point on the right side 
-ghost_point_right = phi_exact.(xR + h, range(tau, (Ntau+1) * tau, length = Ntau + 1));
+ghost_point_right = phi_exact.(xR + h, range(0, (Ntau) * tau, length = Ntau + 1));
 # Ghost point on the left side 
-ghost_point_left = phi_exact.(xL - h, range(tau, (Ntau+1) * tau, length = Ntau + 1));
+ghost_point_left = phi_exact.(xL - h, range(0, (Ntau) * tau, length = Ntau + 1));
 # Ghost point on the time -1
 ghost_point_time = phi_exact.(x, -tau);
 
@@ -98,7 +97,7 @@ ghost_point_time = phi_exact.(x, -tau);
 α0 = 1/3;
 
 ω = zeros(Nx + 1) .+ ω0;
-α = zeros(Nx + 1)
+α = zeros(Nx + 1) .+ 0;
 
 l = zeros(Nx + 1)
 s = zeros(Nx + 1)
@@ -124,6 +123,12 @@ for n = 1:Ntau
             # Predictor
             phi_predictor_i[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
+            # predictor in time n
+            phi_predictor_n[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+
+            # Predictor in time n + 2 preparation
+            phi_predictor_n2[i, n + 1] = ( phi_predictor_n[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+
         end
 
         # Solve linear system - fast sweeping
@@ -141,9 +146,16 @@ for n = 1:Ntau
                 phi_right = ghost_point_right[n + 1];
             end
 
-            phi[i, n + 1] =  ( phi[i, n] - 0.5 * ( - 2 * phi[i, n] + phi_old[i] ) + 
+            phi[i, n + 1] =  ( phi[i, n] - α[i]/2 * ( phi_predictor_n2[i, n + 1] - 2 * phi_predictor_n[i, n + 1] + phi_predictor_n[i, n] ) - (1-α[i])/2 * ( - 2 * phi[i, n] + phi_old[i] ) + 
                                         c[i] * ( phi[i-1, n+1] - ( ω[i] / 2 )* (phi_right - 2 * phi_predictor_i[i, n + 1] + phi_predictor_i[i - 1, n + 1]) -
                                          ( (1 - ω[i]) / 2 )* ( - 2 * phi[i - 1, n + 1] + phi_left) ) ) / (1 + 1/2 + c[i] * (1 + (1 - ω[i]) / 2) );
+
+            # phi[i, n + 1] =  ( phi[i, n] - 0.5 * ( - 2 * phi[i, n] + phi_old[i] ) + 
+            #                             c[i] * ( phi[i-1, n+1] - ( ω[i] / 2 )* (phi_right - 2 * phi_predictor_i[i, n + 1] + phi_predictor_i[i - 1, n + 1]) -
+            #                              ( (1 - ω[i]) / 2 )* ( - 2 * phi[i - 1, n + 1] + phi_left) ) ) / (1 + 1/2 + c[i] * (1 + (1 - ω[i]) / 2) );
+
+            # Update predictor in time n + 2
+            phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         end
 

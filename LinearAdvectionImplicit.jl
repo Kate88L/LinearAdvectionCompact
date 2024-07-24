@@ -14,10 +14,10 @@ include("Utils/ExactSolutions.jl")
 level = 0;
 
 # Level of correction
-p = 5;
+p = 10;
 
 # Courant number
-C = 5;
+C = 2;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -97,7 +97,7 @@ ghost_point_time = phi_exact.(x, -tau);
 α0 = 1/3;
 
 ω = zeros(Nx + 1) .+ ω0;
-α = zeros(Nx + 1) .+ 0;
+α = zeros(Nx + 1) .+ α0;
 
 l = zeros(Nx + 1)
 s = zeros(Nx + 1)
@@ -127,8 +127,9 @@ for n = 1:Ntau
             phi_predictor_n[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
             # Predictor in time n + 2 preparation
-            phi_predictor_n2[i, n + 1] = ( phi_predictor_n[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
-
+            if n < 2
+                phi_predictor_n2[i, n + 1] = ( phi_predictor_n[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            end
         end
 
         # Solve linear system - fast sweeping
@@ -146,13 +147,9 @@ for n = 1:Ntau
                 phi_right = ghost_point_right[n + 1];
             end
 
-            phi[i, n + 1] =  ( phi[i, n] - α[i]/2 * ( phi_predictor_n2[i, n + 1] - 2 * phi_predictor_n[i, n + 1] + phi_predictor_n[i, n] ) - (1-α[i])/2 * ( - 2 * phi[i, n] + phi_old[i] ) + 
+            phi[i, n + 1] =  ( phi[i, n] - α[i] / 2 * ( phi_predictor_n2[i, n + 1] - 2 * phi_predictor_n[i, n + 1] + phi_predictor_n[i, n] ) - ( 1 - α[i] ) / 2 * ( - 2 * phi[i, n] + phi_old[i] ) + 
                                         c[i] * ( phi[i-1, n+1] - ( ω[i] / 2 )* (phi_right - 2 * phi_predictor_i[i, n + 1] + phi_predictor_i[i - 1, n + 1]) -
-                                         ( (1 - ω[i]) / 2 )* ( - 2 * phi[i - 1, n + 1] + phi_left) ) ) / (1 + 1/2 + c[i] * (1 + (1 - ω[i]) / 2) );
-
-            # phi[i, n + 1] =  ( phi[i, n] - 0.5 * ( - 2 * phi[i, n] + phi_old[i] ) + 
-            #                             c[i] * ( phi[i-1, n+1] - ( ω[i] / 2 )* (phi_right - 2 * phi_predictor_i[i, n + 1] + phi_predictor_i[i - 1, n + 1]) -
-            #                              ( (1 - ω[i]) / 2 )* ( - 2 * phi[i - 1, n + 1] + phi_left) ) ) / (1 + 1/2 + c[i] * (1 + (1 - ω[i]) / 2) );
+                                         ( (1 - ω[i]) / 2 )* ( - 2 * phi[i - 1, n + 1] + phi_left) ) ) / (1 + (1 - α[i]) / 2 + c[i] * (1 + (1 - ω[i]) / 2) );
 
             # Update predictor in time n + 2
             phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
@@ -160,17 +157,18 @@ for n = 1:Ntau
         end
 
         # compute convergence
-        S = 0;
-        for i = 3:1:Nx 
-            S += abs(phi[i, n + 1] - phi[i, n] + 0.5 * (phi[i, n + 1] - 2 * phi[i, n] + phi_old[i]) + 
-            c[i] * ( phi[i, n + 1] - phi[i - 1, n + 1] + ω[i] / 2 * (phi[i + 1, n + 1] - 2 * phi[i, n + 1] + phi[i - 1, n + 1]) + 
-            (1 - ω[i]) / 2 * ( phi[i, n + 1] - 2 * phi[i - 1, n + 1] + phi[i - 2, n + 1]) ));
-        end
-        # println("Step: ", j, " S: ", S)
+        # S = 0;
+        # for i = 3:1:Nx 
+        #     S += abs(phi[i, n + 1] - phi[i, n] + 0.5 * (phi[i, n + 1] - 2 * phi[i, n] + phi_old[i]) + 
+        #     c[i] * ( phi[i, n + 1] - phi[i - 1, n + 1] + ω[i] / 2 * (phi[i + 1, n + 1] - 2 * phi[i, n + 1] + phi[i - 1, n + 1]) + 
+        #     (1 - ω[i]) / 2 * ( phi[i, n + 1] - 2 * phi[i - 1, n + 1] + phi[i - 2, n + 1]) ));
+        # end
+        # # println("Step: ", j, " S: ", S)
 
-        if ( S < 1e-4 )
-            break
-        end
+        # if ( S < 1e-4 )
+        #     println("Converged in step: ", j, " is " , S)
+        #     break
+        # end
     end
 end
 
@@ -178,13 +176,13 @@ end
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
 println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
-println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
+# println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
+# println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
 
 
 # Print first order error
 println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
+# println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
 
 println("=============================")
 

@@ -14,13 +14,13 @@ include("../Utils/ExactSolutions.jl")
 level = 0;
 
 # Courant number
-C = 0.01;
+C = 8;
 
 # Grid settings
-xL = - 2 * π / 2
-xR = 3 * π / 2
-yL = - 2 * π / 2
-yR = 3 * π / 2
+xL = -1 #- 2 * π / 2
+xR = 1 #3 * π / 2
+yL = xL
+yR = xR
 N = 80 * 2^level
 h = (xR - xL) / N # regular grid
 
@@ -29,7 +29,8 @@ u(x, y) = 1.0
 v(x, y) = 1.0
 
 # Initial condition
-phi_0(x, y) = x.^2 + y.^2
+# phi_0(x, y) = x.^2 + y.^2
+phi_0(x, y) = piecewiseLinear2D(x, y);
 
 # Exact solution
 phi_exact(x, y, t) = phi_0.(x - u(x,y) .* t, y - v(x,y) .* t);
@@ -137,6 +138,25 @@ for n = 1 : Ntau
             phi_bottom = ghost_point_bottom[i, n + 1];
         end
 
+        # ENO
+        if abs(phi_star[i, j, n + 2] - 2 * phi_star[i, j, n + 1] + phi_star[i, j, n]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i, j, n] + phi_old[i, j])
+            α[i, j] = 1;
+        else
+            α[i, j] = 0;
+        end
+
+        if abs(phi_star[i + 1, j, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i - 1, j, n + 1]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i - 1, j, n + 1] + phi_left )
+            ω_x[i, j] = 1;
+        else
+            ω_x[i, j] = 0;
+        end
+
+        if abs(phi_star[i, j + 1, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i, j - 1, n + 1]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i, j - 1, n + 1] + phi_bottom )
+            ω_y[i, j] = 1;
+        else
+            ω_y[i, j] = 0;
+        end
+
         # Second order solution
         phi[i, j, n + 1] = ( phi[i, j, n] - α[i, j] / 2 * ( phi_star[i, j, n + 2] - 2 * phi_star[i, j, n + 1] + phi_star[i, j, n] ) 
                                 - ( 1 - α[i, j] ) / 2 * ( phi_star[i, j, n + 1] - 2 * phi_star[i, j, n] + phi_old[i, j] )
@@ -167,6 +187,25 @@ for n = 1 : Ntau
                 phi_bottom = phi_star[i, j - 2, n + 2];
             else
                 phi_bottom = ghost_point_bottom[i, n + 2];
+            end
+
+            # ENO
+            if abs(phi_star[i, j, n + 3] - 2 * phi_star[i, j, n + 2] + phi_star[i, j, n + 1]) <= abs(phi_star[i, j, n + 2] - 2 * phi_star[i, j, n + 1] + phi_star[i, j, n])
+                α[i, j] = 1;
+            else
+                α[i, j] = 0;
+            end
+
+            if abs(phi_star[i + 1, j, n + 2] - 2 * phi_star[i, j, n + 2] + phi_star[i - 1, j, n + 2]) <= abs(phi_star[i, j, n + 2] - 2 * phi_star[i - 1, j, n + 2] + phi_left )
+                ω_x[i, j] = 1;
+            else
+                ω_x[i, j] = 0;
+            end
+
+            if abs(phi_star[i, j + 1, n + 2] - 2 * phi_star[i, j, n + 2] + phi_star[i, j - 1, n + 2]) <= abs(phi_star[i, j, n + 2] - 2 * phi_star[i, j - 1, n + 2] + phi_bottom )
+                ω_y[i, j] = 1;
+            else
+                ω_y[i, j] = 0;
             end
 
             # Second order solution
@@ -202,6 +241,25 @@ for n = 1 : Ntau
                 phi_bottom = phi[i, j - 2, n + 1];
             else
                 phi_bottom = ghost_point_bottom[i, n + 1];
+            end
+
+            # ENO
+            if abs(phi_star[i, j, n + 2] - 2 * phi_star[i, j, n + 1] + phi_star[i, j, n]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i, j, n] + phi_old[i, j])
+                α[i, j] = 1;
+            else
+                α[i, j] = 0;
+            end
+
+            if abs(phi_star[i + 1, j, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i - 1, j, n + 1]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i - 1, j, n + 1] + phi_left )
+                ω_x[i, j] = 1;
+            else
+                ω_x[i, j] = 0;
+            end
+
+            if abs(phi_star[i, j + 1, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i, j - 1, n + 1]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i, j - 1, n + 1] + phi_bottom )
+                ω_y[i, j] = 1;
+            else
+                ω_y[i, j] = 0;
             end
 
             # Second order solution

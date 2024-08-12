@@ -20,6 +20,11 @@ function piecewiseLinear(x)
     end
 end
 
+# Piecewise linear 2D function
+function piecewiseLinear2D(x, y) 
+    return max(abs(x), abs(y)) - 0.5
+end
+
 # Non smooth function
 function nonSmooth(x)
     c = -(sqrt(3)/2 + 9/2 + 2*pi/3) * (x + 1)

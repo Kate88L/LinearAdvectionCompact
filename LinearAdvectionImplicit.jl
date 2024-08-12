@@ -14,15 +14,15 @@ include("Utils/ExactSolutions.jl")
 level = 0;
 
 # Level of correction
-p = 10;
+p = 4;
 
 # Courant number
-C = 2;
+C = 1;
 
 # Grid settings
 xL = - 1 * π / 2
 xR = 3 * π / 2
-Nx = 100 * 2^level
+Nx = 40 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
@@ -43,7 +43,7 @@ phi_exact(x, t) = phi_0.(x - t);
 ## Comptutation
 
 # Grid initialization
-x = range(xL, xR, length = Nx + 1)
+x = range(xL, xR+h, length = Nx + 2)
 
 # Time
 T = 8 * π / sqrt(7) * 2
@@ -54,15 +54,15 @@ tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
 
-# Ntau = 1
+# Ntau = 4
 
-c = zeros(Nx+1) .+ u.(x) * tau / h
+c = zeros(Nx+2) .+ u.(x) * tau / h
 
-phi = zeros(Nx + 1, Ntau + 1);
-phi_predictor_i = zeros(Nx + 1, Ntau + 1); # predictor in time n+1
-phi_predictor_n = zeros(Nx + 1, Ntau + 1); # predictor in time n
-phi_predictor_n2 = zeros(Nx + 1, Ntau + 1); # predictor in time n+2
-phi_first_order = zeros(Nx + 1, Ntau + 1);
+phi = zeros(Nx + 2, Ntau + 1);
+phi_predictor_i = zeros(Nx + 2, Ntau + 1); # predictor in time n+1
+phi_predictor_n = zeros(Nx + 2, Ntau + 1); # predictor in time n
+phi_predictor_n2 = zeros(Nx + 2, Ntau + 1); # predictor in time n+2
+phi_first_order = zeros(Nx + 2, Ntau + 1);
 
 # Initial condition
 phi[:, 1] = phi_0.(x);
@@ -85,7 +85,8 @@ phi_predictor_n2[1, :] = phi_exact.(x[1], range(tau, (Ntau + 1) * tau, length = 
 
 
 # Ghost point on the right side 
-ghost_point_right = phi_exact.(xR + h, range(0, (Ntau) * tau, length = Ntau + 1));
+# PF we want to use predicted values for the ghost point on the right
+# ghost_point_right = phi_exact.(xR + h, range(0, (Ntau) * tau, length = Ntau + 1));
 # Ghost point on the left side 
 ghost_point_left = phi_exact.(xL - h, range(0, (Ntau) * tau, length = Ntau + 1));
 # Ghost point on the time -1
@@ -93,8 +94,8 @@ ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
 ϵ = 1e-16;
-ω0 = 1/3;
-α0 = 1/3;
+ω0 = 0/3;
+α0 = 1/2;
 
 ω = zeros(Nx + 1) .+ ω0;
 α = zeros(Nx + 1) .+ α0;
@@ -115,7 +116,7 @@ for n = 1:Ntau
     for j = 1:p
 
         # Prepare predictors
-        for i = 2:1:Nx + 1
+        for i = 2:1:Nx + 2
 
             # First order solution
             phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
@@ -124,7 +125,8 @@ for n = 1:Ntau
             phi_predictor_i[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
             # predictor in time n
-            phi_predictor_n[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            # phi_predictor_n[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            phi_predictor_n[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
             # Predictor in time n + 2 preparation
             if n < 2
@@ -141,11 +143,13 @@ for n = 1:Ntau
                 phi_left = ghost_point_left[n + 1];
             end
 
-            if i < Nx + 1
-                phi_right = phi_predictor_i[i + 1, n + 1];
-            else
-                phi_right = ghost_point_right[n + 1];
-            end
+            # if i < Nx + 1
+            #     phi_right = phi_predictor_i[i + 1, n + 1];
+            # else
+            #     phi_right = ghost_point_right[n + 1];
+            # end
+
+            phi_right = phi_predictor_i[i + 1, n + 1];
 
             phi[i, n + 1] =  ( phi[i, n] - α[i] / 2 * ( phi_predictor_n2[i, n + 1] - 2 * phi_predictor_n[i, n + 1] + phi_predictor_n[i, n] ) - ( 1 - α[i] ) / 2 * ( - 2 * phi[i, n] + phi_old[i] ) + 
                                         c[i] * ( phi[i-1, n+1] - ( ω[i] / 2 )* (phi_right - 2 * phi_predictor_i[i, n + 1] + phi_predictor_i[i - 1, n + 1]) -
@@ -155,6 +159,8 @@ for n = 1:Ntau
             phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         end
+        i = Nx +2;
+        phi[i, n + 1] = 2*phi[i-1, n + 1] - phi[i-2, n + 1];
 
         # compute convergence
         # S = 0;
@@ -175,14 +181,14 @@ end
 # Print error
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
-println("Error L2: ", norm(phi[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
+println("Error L2: ", norm(phi[1:Nx+1,end] - phi_exact.(x[1:Nx+1], Ntau * tau), 2) * h)
 # println("Error L_inf: ", norm(phi[:, end] - phi_exact.(x, Ntau * tau), Inf) )
 # println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
 
 
 # Print first order error
-println("Error L2 first order: ", norm(phi_first_order[:,end] - phi_exact.(x, Ntau * tau), 2) * h)
-# println("Error L_inf firts order: ", norm(phi_first_order[:, end] - phi_exact.(x, Ntau * tau), Inf))
+println("Error L2 first order: ", norm(phi_first_order[1:Nx+1,end] - phi_exact.(x[1:Nx+1], Ntau * tau), 2) * h)
+println("Error L_inf firts order: ", norm(phi_first_order[1:Nx+1, end] - phi_exact.(x[1:Nx+1], Ntau * tau), Inf))
 
 println("=============================")
 
@@ -204,8 +210,8 @@ phi_d = zeros(Nx + 1, Ntau + 1)
 phi_dd = zeros(Nx + 1, Ntau + 1)
 TVD = zeros(Ntau + 1)
 for n = 1:Ntau + 1
-    phi_d[:, n] = [ diff(phi[:, n]) / h ; ( phi[2, n] - phi[end, n] ) / h ];
-    phi_dd[:, n] = [ diff(phi_d[:, n]) / h ; ( phi_d[2, n] - phi_d[end, n] ) / h ]; 
+    phi_d[:, n] = [ diff(phi[1:Nx+1, n]) / h ; ( phi[2, n] - phi[end, n] ) / h ];
+    phi_dd[:, n] = [ diff(phi_d[1:Nx+1, n]) / h ; ( phi_d[2, n] - phi_d[end, n] ) / h ]; 
     TVD[n] = sum(abs.(phi_dd[:,n]));
 end
 
@@ -213,8 +219,8 @@ phi_d = zeros(Nx + 1, Ntau + 1)
 phi_dd = zeros(Nx + 1, Ntau + 1)
 TVD_1 = zeros(Ntau + 1)
 for n = 1:Ntau + 1
-    phi_d[:, n] = [ diff(phi_first_order[:, n]) / h ; ( phi_first_order[2, n] - phi_first_order[end, n] ) / h ];
-    phi_dd[:, n] = [ diff(phi_d[:, n]) / h ; ( phi_d[2, n] - phi_d[end, n] ) / h ]; 
+    phi_d[:, n] = [ diff(phi_first_order[1:Nx+1, n]) / h ; ( phi_first_order[2, n] - phi_first_order[end, n] ) / h ];
+    phi_dd[:, n] = [ diff(phi_d[1:Nx+1, n]) / h ; ( phi_d[2, n] - phi_d[end, n] ) / h ]; 
     TVD_1[n] = sum(abs.(phi_dd[:,n]));
 end
 
@@ -222,11 +228,11 @@ CSV.write("phi.csv", DataFrame(phi, :auto))
 
 # Plot of the result at the final time together with the exact solution
 # trace1 = scatter(x = x, y = phi_8[:,end], mode = "lines", name = "Compact TVD C = 8", line=attr(color="firebrick", width=2))
-trace2 = scatter(x = x, y = phi_exact.(x, Ntau*tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
+trace2 = scatter(x = x[1:Nx+1], y = phi_exact.(x[1:Nx+1], Ntau*tau), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
 trace1 = scatter(x = x, y = phi_0.(x), mode = "lines", name = "Initial Condition", line=attr(color="black", width=1, dash = "dash") )
 # trace4 = scatter(x = x, y = phi_1[:,end], mode = "lines", name = "Compact TVD C = 1", line=attr(color="green", width=2))
 # trace5 = scatter(x = x, y = phi_16[:,end], mode = "lines", name = "Compact TVD C = 1.6", line=attr(color="orange", width=2))
-trace3 = scatter(x = x, y = phi[:,end], mode = "lines", name = "Compact TVD", line=attr(color="firebrick", width=2))
+trace3 = scatter(x = x[1:Nx+1], y = phi[1:Nx+1,end], mode = "lines", name = "Compact TVD", line=attr(color="firebrick", width=2))
 
 
 layout = Layout(plot_bgcolor="white", 
@@ -239,8 +245,8 @@ plot_phi
 CSV.write("phi.csv", DataFrame(phi,:auto))
 
 # Plot of the numerical derivative of the solution and the exact solution at the final time
-trace1_d = scatter(x = x, y = diff(phi[:, end]) / h, mode = "lines", name = "Compact sol. gradient")
-trace2_d = scatter(x = x, y = diff(phi_exact.(x, Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
+trace1_d = scatter(x = x[1:Nx+1], y = diff(phi[1:Nx+1, end]) / h, mode = "lines", name = "Compact sol. gradient")
+trace2_d = scatter(x = x[1:Nx+1], y = diff(phi_exact.(x[1:Nx+1], Ntau * tau)) / h, mode = "lines", name = "Exact sol. gradient")
 trace3_d = scatter(x = x, y = diff(phi_first_order[:, end]) / h, mode = "lines", name = "First order sol. gradient")
 
 layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = "x", yaxis_title = "Dphi/Dx")

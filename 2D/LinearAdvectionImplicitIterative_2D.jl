@@ -11,10 +11,10 @@ include("../Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 4;
 
 # Courant number
-C = 8;
+C = 1;
 
 # Grid settings
 xL = -1 #- 2 * π / 2
@@ -45,7 +45,7 @@ X = repeat(x, 1, N + 2)
 Y = repeat(y', N + 2, 1)
 
 # Time
-Tfinal = 1 * π / sqrt(7) * 2 / 10
+Tfinal = 1 * π / sqrt(7) * 2 / 20
 Ntau = 1 * 2^level
 tau = C * h / maximum(max(u.(x, y), v.(x, y)))
 Ntau = Int(round(Tfinal / tau))
@@ -105,7 +105,7 @@ for n = 1 : Ntau
         phi_old = ghost_point_time;
     end
 
-    # Compute ALL first order predictors (VECTORIZATION ???)
+    # Compute ALL first order predictors 
     for i = 2 : N + 2
     for j = 2 : N + 2
        
@@ -291,6 +291,17 @@ println("Error t*h: ", Error_t_h)
 Error_t_h_first_order = tau * h^2 * sum(sum(abs.(phi_first_order[:, :, n] - phi_exact.(X, Y, t[n]))) for n in 1:Ntau+1)
 println("Error t*h first order: ", Error_t_h_first_order)
 
+# Compute gradient of the solution in the last time step
+d_phi_x = zeros(N + 1, N + 1);
+d_phi_y = zeros(N + 1, N + 1);
+
+for i = 1 : N + 1
+for j = 1 : N + 1
+   d_phi_x[i, j] = (phi[i + 1, j, end-1] - phi[i, j, end-1]) / h;
+   d_phi_y[i, j] = (phi[i, j + 1, end-1] - phi[i, j, end-1]) / h;
+end
+end
+
 # Plot of the result at the final time together with the exact solution
 trace1 = contour(x = x, y = y, z = phi_exact.(X, Y, Ntau * tau), name = "Exact solution", showscale=false, contours_coloring="lines", colorscale="Greys", line_width=2)
 trace2 = contour(x = x, y = y, z = phi[:, :, end - 1], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
@@ -298,3 +309,15 @@ trace3 = contour(x = x, y = y, z = phi_first_order[:, :, end - 1], name = "First
 layout = Layout(title = "Linear advection equation", xaxis_title = "x", yaxis_title = "y", zaxis_title = "phi", colorbar = false)
 
 plot_phi = plot([trace1, trace3, trace2], layout)
+
+# Plot derivative
+trace1_d_x = surface(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+
+trace1_d_y = surface(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+
+plot_phi_d_x = plot([trace1_d_x])
+plot_phi_d_y = plot([trace1_d_y])
+
+p = [plot_phi; plot_phi_d_x plot_phi_d_y]
+relayout!(p, width=800, height=1000)
+p

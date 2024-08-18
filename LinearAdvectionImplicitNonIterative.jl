@@ -11,10 +11,10 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 2;
 
 # Courant number
-C = 8;
+C = 0.1;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -88,8 +88,8 @@ ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
 ϵ = 1e-16;
-ω0 = 3/3;
-α0 = 3/3;
+ω0 = 0/3;
+α0 = 0/3;
 
 ω = zeros(Nx + 1) .+ ω0;
 α = zeros(Nx + 1) .+ α0;

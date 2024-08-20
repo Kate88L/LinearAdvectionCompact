@@ -11,10 +11,10 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 1;
 
 # Courant number
-C = 1;
+C = 2;
 
 # Grid settings
 xL =  0 # - 1 * π / 2
@@ -57,7 +57,7 @@ Ntau = Int(round(T / tau))
 c = zeros(Nx+2) .+ u.(x) * tau / h
 
 # predictor
-phi1 = zeros(Nx + 2, Ntau + 2);
+phi1 = zeros(Nx + 2, Ntau + 3);
 # corrector and the final solution
 phi2 = zeros(Nx + 2, Ntau + 2);
 # first order
@@ -69,7 +69,7 @@ phi2[:, 1] = phi_0.(x);
 phi_first_order[:, 1] = phi_0.(x);
 
 # Boundary conditions
-phi1[1, :] = phi_exact.(x[1], range(0, (Ntau+1) * tau, length = Ntau + 2));
+phi1[1, :] = phi_exact.(x[1], range(0, (Ntau+2) * tau, length = Ntau + 3));
 phi2[1, :] = phi_exact.(x[1], range(0, (Ntau+1) * tau, length = Ntau + 2));
 phi_first_order[1, :] = phi_exact.(x[1], range(0, (Ntau+1) * tau, length = Ntau + 2));
 
@@ -104,12 +104,10 @@ for n = 1:Ntau
         # Nutne pre 2. rad:
         phi1[i, n + 0] = ( phi_old[i] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n] ) / ( 1 + abs(c[i]) );
         # PF znizi rad tato volba:
-        # phi1[i, n + 0] = phi2[i, n];;
+        # phi1[i, n + 0] = phi2[i, n];
         phi1[i, n + 1] = ( phi1[i, n] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
         phi1[i, n + 2] = ( phi1[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 2] ) / ( 1 + abs(c[i]) );
-        if n < Ntau
-            phi1[i, n + 3] = ( phi1[i, n + 2] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 3] ) / ( 1 + abs(c[i]) );
-        end
+        phi1[i, n + 3] = ( phi1[i, n + 2] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 3] ) / ( 1 + abs(c[i]) );
     end
 
     # First iteration, it should be already 2nd order accurate:
@@ -143,80 +141,76 @@ for n = 1:Ntau
     end
     phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
 
-    # continue
-
     # Preparation for the 2nd iteration, second order correction at n+2
-    if n < Ntau
-        for i = 2:1:Nx + 1
+    for i = 2:1:Nx + 1
 
-            if i > 2
-                phi_left = phi1[i - 2, n + 2];
-            else
-                phi_left = ghost_point_left[n + 2];
-            end
-
-            # ENO parameter
-            if abs(phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) <= abs(phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2])
-                ω[i] = 0
-            else
-                ω[i] = 1
-            end    
-
-            if abs(phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n]) <= abs( phi1[i, n + 3] - 2*phi1[i, n + 2] + phi1[i, n + 1])
-                α[i] = 0
-            else
-                α[i] = 1
-            end
-        
-            phi2[i, n + 2] =  ( phi2[i, n + 1] 
-                - α[i] / 2 * ( phi1[i, n + 3] - 2*phi1[i, n + 2] + phi1[i, n + 1] ) 
-                - ( 1 - α[i] ) / 2 * ( phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n] ) 
-                + c[i] * ( phi2[i-1, n + 2] 
-                - ( ω[i] / 2 )* (phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2]) 
-            - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) ) ) / (1 + c[i]);
-        end
-        phi2[Nx + 2, n + 2] = 3*phi2[Nx + 1, n + 2] - 3*phi2[Nx + 0, n + 2] + phi2[Nx - 1, n + 2];
-
-     # Second and the final iteration
-        if n > 1
-            phi_old = phi2[:, n-1];
+        if i > 2
+            phi_left = phi1[i - 2, n + 2];
         else
-            phi_old = ghost_point_time;
-        end
-    
-        for i=2:1:Nx+2
-            phi1[i, n] = phi2[i, n];
-            phi1[i, n + 1] = phi2[i, n + 1];
-            phi1[i, n + 2] = phi2[i, n + 2];
-        end
-
-        for i = 2:1:Nx + 1
-            if i > 2
-                phi_left = phi2[i - 2, n + 1];
-            else
-                phi_left = ghost_point_left[n + 1];
+            phi_left = ghost_point_left[n + 2];
         end
 
         # ENO parameter
-        if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
+        if abs(phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) <= abs(phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2])
             ω[i] = 0
         else
             ω[i] = 1
-        end
+        end    
 
-        if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
+        if abs(phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n]) <= abs( phi1[i, n + 3] - 2*phi1[i, n + 2] + phi1[i, n + 1])
             α[i] = 0
         else
             α[i] = 1
         end
+    
+        phi2[i, n + 2] =  ( phi2[i, n + 1] 
+            - α[i] / 2 * ( phi1[i, n + 3] - 2*phi1[i, n + 2] + phi1[i, n + 1] ) 
+            - ( 1 - α[i] ) / 2 * ( phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n] ) 
+            + c[i] * ( phi2[i-1, n + 2] 
+            - ( ω[i] / 2 )* (phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2]) 
+        - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) ) ) / (1 + c[i]);
+    end
+    phi2[Nx + 2, n + 2] = 3*phi2[Nx + 1, n + 2] - 3*phi2[Nx + 0, n + 2] + phi2[Nx - 1, n + 2];
 
-        phi2[i, n + 1] =  ( phi2[i, n] 
-            - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
-            - ( 1 - α[i] ) / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
-            + c[i] * ( phi2[i - 1, n + 1] 
-            - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
-        - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
-        end
+    # Second and the final iteration
+    if n > 1
+        phi_old = phi2[:, n-1];
+    else
+        phi_old = ghost_point_time;
+    end
+
+    for i=2:1:Nx+2
+        phi1[i, n] = phi2[i, n];
+        phi1[i, n + 1] = phi2[i, n + 1];
+        phi1[i, n + 2] = phi2[i, n + 2];
+    end
+
+    for i = 2:1:Nx + 1
+        if i > 2
+            phi_left = phi2[i - 2, n + 1];
+        else
+            phi_left = ghost_point_left[n + 1];
+    end
+
+    # ENO parameter
+    if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
+        ω[i] = 0
+    else
+        ω[i] = 1
+    end
+
+    if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
+        α[i] = 0
+    else
+        α[i] = 1
+    end
+
+    phi2[i, n + 1] =  ( phi2[i, n] 
+        - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
+        - ( 1 - α[i] ) / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
+        + c[i] * ( phi2[i - 1, n + 1] 
+        - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
+    - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
     end
     phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
 
@@ -225,29 +219,7 @@ end
 # Print error
 Error_t_h = tau * h * sum(abs(phi2[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
-# println("Error L2: ", norm(phi2[1:Nx+1,end-1] - phi_exact.(x[1:Nx+1], Ntau * tau), 2) * h)
-# println("Error L_inf: ", norm(phi[:, end-1] - phi_exact.(x, Ntau * tau), Inf) )
-# println("Error L_inf: ", maximum(abs(phi[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1) )
-
-
-# Print first order error
-# println("Error L2 first order: ", norm(phi_first_order[1:Nx+1,end-1] - phi_exact.(x[1:Nx+1], Ntau * tau), 2) * h)
-# println("Error L_inf firts order: ", norm(phi_first_order[1:Nx+1, end] - phi_exact.(x[1:Nx+1], Ntau * tau), Inf))
-
 println("=============================")
-
-# Read the data from the file
-# df_8 = CSV.File("c_8.csv") |> DataFrame
-# phi_8 = Matrix(df_8)
-
-# df_1 = CSV.File("c_1.csv") |> DataFrame
-# phi_1 = Matrix(df_1)
-
-# df_16 = CSV.File("c_1.6.csv") |> DataFrame
-# phi_16 = Matrix(df_16)
-
-# df_08 = CSV.File("c_0.8.csv") |> DataFrame
-# phi_08 = Matrix(df_08)
 
 # Compute TVD property of the derivative
 phi_d = zeros(Nx + 1, Ntau + 1)

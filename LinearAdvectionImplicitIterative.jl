@@ -86,16 +86,15 @@ ghost_point_time = phi_exact.(x, -tau);
 ω = zeros(Nx + 1) .+ ω0;
 α = zeros(Nx + 1) .+ α0;
 
+# Initial old solution
+phi_old = ghost_point_time
+
 # Time Loop
 for n = 1:Ntau
 
-    # First iteration, second order correction at n+1
-    if n > 1
-        phi_old = phi2[:, n-1];
-    else
-        phi_old = ghost_point_time;
-    end
+    global phi_old;
 
+    # First iteration, second order correction at n+1
     # First order predictors
     for i = 2:1:Nx + 2
 
@@ -103,8 +102,6 @@ for n = 1:Ntau
 
         # Nutne pre 2. rad:
         phi1[i, n + 0] = ( phi_old[i] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n] ) / ( 1 + abs(c[i]) );
-        # PF znizi rad tato volba:
-        # phi1[i, n + 0] = phi2[i, n];
         phi1[i, n + 1] = ( phi1[i, n] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
         phi1[i, n + 2] = ( phi1[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 2] ) / ( 1 + abs(c[i]) );
         phi1[i, n + 3] = ( phi1[i, n + 2] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 3] ) / ( 1 + abs(c[i]) );
@@ -138,12 +135,8 @@ for n = 1:Ntau
             + c[i] * ( phi2[i-1, n + 1] 
             - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
         - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
-    end
-    phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
 
-    # Preparation for the 2nd iteration, second order correction at n+2
-    for i = 2:1:Nx + 1
-
+        # Preparation for the 2nd iteration, second order correction at n+2
         if i > 2
             phi_left = phi1[i - 2, n + 2];
         else
@@ -170,50 +163,46 @@ for n = 1:Ntau
             - ( ω[i] / 2 )* (phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2]) 
         - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) ) ) / (1 + c[i]);
     end
+
+    phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
     phi2[Nx + 2, n + 2] = 3*phi2[Nx + 1, n + 2] - 3*phi2[Nx + 0, n + 2] + phi2[Nx - 1, n + 2];
 
     # Second and the final iteration
-    if n > 1
-        phi_old = phi2[:, n-1];
-    else
-        phi_old = ghost_point_time;
-    end
-
-    for i=2:1:Nx+2
-        phi1[i, n] = phi2[i, n];
-        phi1[i, n + 1] = phi2[i, n + 1];
-        phi1[i, n + 2] = phi2[i, n + 2];
-    end
+    phi1[:, n] = phi2[:, n];
+    phi1[:, n + 1] = phi2[:, n + 1];
+    phi1[:, n + 2] = phi2[:, n + 2];
 
     for i = 2:1:Nx + 1
         if i > 2
             phi_left = phi2[i - 2, n + 1];
         else
             phi_left = ghost_point_left[n + 1];
-    end
+        end
 
-    # ENO parameter
-    if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
-        ω[i] = 0
-    else
-        ω[i] = 1
-    end
+        # ENO parameter
+        if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
+            ω[i] = 0
+        else
+            ω[i] = 1
+        end
 
-    if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
-        α[i] = 0
-    else
-        α[i] = 1
-    end
+        if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
+            α[i] = 0
+        else
+            α[i] = 1
+        end
 
-    phi2[i, n + 1] =  ( phi2[i, n] 
-        - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
-        - ( 1 - α[i] ) / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
-        + c[i] * ( phi2[i - 1, n + 1] 
-        - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
-    - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
+        phi2[i, n + 1] =  ( phi2[i, n] 
+            - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
+            - ( 1 - α[i] ) / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
+            + c[i] * ( phi2[i - 1, n + 1] 
+            - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
+        - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
     end
     phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
 
+    # Update old solution
+    phi_old = phi2[:, n];
 end
 
 # Print error

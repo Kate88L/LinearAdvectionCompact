@@ -11,14 +11,16 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 3;
+
+K = 3; # Number of iterations for the second order correction
 
 # Courant number
-C = 2;
+C = 5;
 
 # Grid settings
-xL =  0 # - 1 * π / 2
-xR =  2 # 3 * π / 2
+xL = -1 # - 1 * π / 2
+xR = 1 # 3 * π / 2
 Nx = 80 * 2^level
 h = (xR - xL) / Nx
 
@@ -30,8 +32,8 @@ u(x) = 1
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = cos.(x);
-# phi_0(x) = exp.(-10*(x+0)^2);
-phi_0(x) = piecewiseLinear(x);
+phi_0(x) = exp.(-10*(x+0)^2);
+# phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
@@ -116,17 +118,17 @@ for n = 1:Ntau
             phi_left = ghost_point_left[n + 1];
         end
 
-        # ENO parameter
+        # ENO parameter (0 - upwind, 1 - central)
         if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
             ω[i] = 0
         else
-            ω[i] = 1
+            ω[i] = 0
         end
 
         if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
             α[i] = 0
         else
-            α[i] = 1
+            α[i] = 0
         end
     
         phi2[i, n + 1] =  ( phi2[i, n] 
@@ -143,17 +145,17 @@ for n = 1:Ntau
             phi_left = ghost_point_left[n + 2];
         end
 
-        # ENO parameter
+        # ENO parameter (0 - upwind, 1 - central)
         if abs(phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) <= abs(phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2])
             ω[i] = 0
         else
-            ω[i] = 1
+            ω[i] = 0
         end    
 
         if abs(phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n]) <= abs( phi1[i, n + 3] - 2*phi1[i, n + 2] + phi1[i, n + 1])
             α[i] = 0
         else
-            α[i] = 1
+            α[i] = 0
         end
     
         phi2[i, n + 2] =  ( phi2[i, n + 1] 
@@ -167,40 +169,44 @@ for n = 1:Ntau
     phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
     phi2[Nx + 2, n + 2] = 3*phi2[Nx + 1, n + 2] - 3*phi2[Nx + 0, n + 2] + phi2[Nx - 1, n + 2];
 
-    # Second and the final iteration
-    phi1[:, n] = phi2[:, n];
-    phi1[:, n + 1] = phi2[:, n + 1];
-    phi1[:, n + 2] = phi2[:, n + 2];
+    for k = 1:K # Multiple correction iterations
+        # Second and the final iteration
+        phi1[:, n] = phi2[:, n];
+        phi1[:, n + 1] = phi2[:, n + 1];
+        phi1[:, n + 2] = phi2[:, n + 2];
 
-    for i = 2:1:Nx + 1
-        if i > 2
-            phi_left = phi2[i - 2, n + 1];
-        else
-            phi_left = ghost_point_left[n + 1];
+        for i = 2:1:Nx + 1
+            if i > 2
+                phi_left = phi2[i - 2, n + 1];
+            else
+                phi_left = ghost_point_left[n + 1];
+            end
+
+            # ENO parameter (0 - upwind, 1 - central)
+            if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
+                ω[i] = 0
+            else
+                ω[i] = 1
+            end
+
+            if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
+                α[i] = 0
+            else
+                α[i] = 1
+            end
+
+            phi2[i, n + 1] =  ( phi2[i, n] 
+                - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
+                - ( 1 - α[i] ) / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
+                + c[i] * ( phi2[i - 1, n + 1] 
+                - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
+            - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
+
+            phi2[i, n + 2] = ( phi2[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi2[i - 1, n + 2] ) / ( 1 + abs(c[i]) );
+
+            phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
         end
-
-        # ENO parameter
-        if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
-            ω[i] = 0
-        else
-            ω[i] = 1
-        end
-
-        if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
-            α[i] = 0
-        else
-            α[i] = 1
-        end
-
-        phi2[i, n + 1] =  ( phi2[i, n] 
-            - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
-            - ( 1 - α[i] ) / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
-            + c[i] * ( phi2[i - 1, n + 1] 
-            - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
-        - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
     end
-    phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
-
     # Update old solution
     phi_old = phi2[:, n];
 end

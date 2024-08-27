@@ -15,7 +15,7 @@ level = 3;
 
 K = 3; # Number of iterations for the second order correction
 
-# Courant number
+# Courant like number
 C = 5;
 
 # Grid settings

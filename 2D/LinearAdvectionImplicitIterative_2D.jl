@@ -161,34 +161,14 @@ for n = 1 : Ntau
 
         phi_left = ghost_point_left[:, n + 1];
 
-        phi_left_full = [ ghost_point_left[:, n + 1]'; phi_star[1:end-1, :, n + 1] ]';
-        phi_bottom_full = [ ghost_point_bottom[:, n + 1]  phi_star[:, 1:end-1, n + 1] ]';
-
-        ij_range = 2:N + 1
-        # Compute the conditions for ω and α using vectorized operations
-        α[ij_range, ij_range] .= ifelse.(abs.(phi_star[ij_range, ij_range, n + 1] .- 2 .* phi_star[ij_range, ij_range, n] .+ phi_old[ij_range, ij_range]) .<= abs.(phi_star[ij_range, ij_range, n + 2] .- 2 .* phi_star[ij_range, ij_range, n + 1] .+ phi_star[ij_range, ij_range, n]), 
-                            0, 1)
-        ω_x[ij_range, ij_range] .= ifelse.(abs.(phi_star[ij_range, ij_range, n + 1] .- 2 .* phi_star[ij_range .- 1, ij_range, n + 1] .+ phi_left_full[ij_range .- 1]) .<= abs.(phi_star[ij_range .+ 1, ij_range, n + 1] .- 2 .* phi_star[ij_range, ij_range, n + 1] .+ phi_star[ij_range .- 1, ij_range, n + 1]), 
-                            0, 1)
-        ω_y[ij_range, ij_range] .= ifelse.(abs.(phi_star[ij_range, ij_range, n + 1] .- 2 .* phi_star[ij_range, ij_range .- 1, n + 1] .+ phi_bottom_full[ij_range .- 1]) .<= abs.(phi_star[ij_range, ij_range .+ 1, n + 1] .- 2 .* phi_star[ij_range, ij_range, n + 1] .+ phi_star[ij_range, ij_range .- 1, n + 1]), 
-                            0, 1)
-
         for i = 2 : N + 1
             phi_bottom = ghost_point_bottom[:, n + 1];
             for j = 2 : N + 1
 
                 # ENO parameter (0 - upwind, 1 - central)
-                # if abs(phi_star[i + 1, j, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i - 1, j, n + 1]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i - 1, j, n + 1] + phi_left[j] )
-                #     ω_x[i, j] = 1;
-                # else
-                #     ω_x[i, j] = 0;
-                # ends
-
-                # if abs(phi_star[i, j + 1, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i, j - 1, n + 1]) <= abs(phi_star[i, j, n + 1] - 2 * phi_star[i, j - 1, n + 1] + phi_bottom[i] )
-                #     ω_y[i, j] = 1;
-                # else
-                #     ω_y[i, j] = 0;
-                # end
+                ω_x[i, j] = ifelse( abs(phi_star[i, j, n + 1] - 2 * phi_star[i - 1, j, n + 1] + phi_left[j]) <= abs(phi_star[i + 1, j, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i - 1, j, n + 1]), 0, 1)
+                ω_y[i, j] = ifelse( abs(phi_star[i, j, n + 1] - 2 * phi_star[i, j - 1, n + 1] + phi_bottom[i]) <= abs(phi_star[i, j + 1, n + 1] - 2 * phi_star[i, j, n + 1] + phi_star[i, j - 1, n + 1]), 0, 1)
+                α[i, j] = ifelse( abs(phi_star[i, j, n + 1] - 2 * phi_star[i, j, n] + phi_old[i, j]) <= abs(phi_star[i, j, n + 2] - 2 * phi_star[i, j, n + 1] + phi_star[i, j, n]), 0, 1)
 
                 # Second order solution
                 phi[i, j, n + 1] = ( phi[i, j, n] - α[i, j] / 2 * ( phi_star[i, j, n + 2] - 2 * phi_star[i, j, n + 1] + phi_star[i, j, n] ) 

@@ -138,16 +138,11 @@ for n = 1:Ntau
         phi1[:, n + 2] = phi2[:, n + 2];
 
         phi_left = ghost_point_left[n + 1];
-        phi_left_full = [ ghost_point_left[n + 1]; phi1[1:end-1, n + 1] ];
-
-        i_range = 2:Nx + 1
-        # Compute the conditions for ω and α using vectorized operations
-        ω[i_range] .= ifelse.(abs.(phi1[i_range, n + 1] .- 2 .* phi1[i_range .- 1, n + 1] .+ phi_left_full[i_range .- 1]) .<= abs.(phi1[i_range .+ 1, n + 1] .- 2 .* phi1[i_range, n + 1] .+ phi1[i_range .- 1, n + 1]), 
-                            0, 1)
-        α[i_range] .= ifelse.(abs.(phi1[i_range, n + 1] .- 2 .* phi1[i_range, n] .+ phi_old[i_range]) .<= abs.(phi1[i_range, n + 2] .- 2 .* phi1[i_range, n + 1] .+ phi1[i_range, n]), 
-                            0, 1)
 
         for i = 2:1:Nx + 1
+
+            ω[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]), 0, 1)
+            α[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n]), 0, 1)
 
             phi2[i, n + 1] =  ( phi2[i, n] 
                 - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 

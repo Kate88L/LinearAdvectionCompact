@@ -25,6 +25,23 @@ function phi_derivative_t(phi, x, t)
     return ForwardDiff.derivative(t -> phi(x, t), t)
 end
 
+# Rotation of a square in 2D
+function nonSmoothRotation(x, y, t) 
+
+    x_hat = x .* cos(t) + y .* sin(t) - 1/4
+    y_hat = y .* cos(t) - x .* sin(t) - 1/4
+
+    if y_hat >= abs.(x_hat)
+        return y_hat
+    elseif - y_hat >= abs.(x_hat)
+        return - y_hat
+    elseif x_hat >= abs.(y_hat)
+        return x_hat
+    else
+        return - x_hat
+    end
+end
+
 function exactLozanoAslam(x, t)
     if ( t < 0.5 )
         if 0.3 - 0.0 * t <= x <= 0.3 + t

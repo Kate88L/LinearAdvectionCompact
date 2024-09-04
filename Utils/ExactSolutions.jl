@@ -32,14 +32,16 @@ function nonSmoothRotation(x, y, t)
     y_hat = y .* cos(t) - x .* sin(t) - 1/4
 
     if y_hat >= abs.(x_hat)
-        return y_hat
+        result = y_hat
     elseif - y_hat >= abs.(x_hat)
-        return - y_hat
+        result = - y_hat
     elseif x_hat >= abs.(y_hat)
-        return x_hat
+        result = x_hat
     else
-        return - x_hat
+        result = - x_hat
     end
+
+    return min.(result, 0.15)
 end
 
 function exactLozanoAslam(x, t)

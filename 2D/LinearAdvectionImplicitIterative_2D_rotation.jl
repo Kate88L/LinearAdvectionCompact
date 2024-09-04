@@ -11,9 +11,9 @@ include("../Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 3;
 
-K = 3; # Number of iterations for the second order correction
+K = 4; # Number of iterations for the second order correction
 
 
 # Courant number
@@ -199,24 +199,28 @@ d_phi_y = zeros(N + 1, N + 1);
 
 for i = 1 : N + 1
 for j = 1 : N + 1
-   d_phi_x[i, j] = (phi[i + 2, j + 1, end-1] - phi[i + 1, j + 1, end-1]) / h;
-   d_phi_y[i, j] = (phi[i + 1, j + 2, end-1] - phi[i + 1, j + 1, end-1]) / h;
+   d_phi_x[i, j] = (phi[i + 1, j, end-1] - phi[i, j, end-1]) / h;
+   d_phi_y[i, j] = (phi[i, j + 1, end-1] - phi[i, j, end-1]) / h;
 end
 end
 
+println("minimum derivative x: ", minimum(d_phi_x))
+println("maximum derivative x: ", maximum(d_phi_x))
+println("minimum derivative y: ", minimum(d_phi_y))
+println("maximum derivative y: ", maximum(d_phi_y))
 
 # Plot of the result at the final time together with the exact solution
 trace1 = contour(x = x, y = y, z = phi_exact.(X, Y, t[end - 1])', name = "Exact solution", showscale=false, contours_coloring="lines", colorscale="Greys", line_width=2)
-trace2 = contour(x = x, y = y, z = phi_first_order[:, :, end]', name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_dash="dash", line_width=1)
-trace3 = contour(x = x, y = y, z = phi[:, :, end - 1]', name = "Second order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
+trace2 = contour(x = x, y = y, z = phi_first_order[:, :, end]',name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_dash="dash", line_width=1)
+trace3 = contour(x = x, y = y, z = phi[:, :, end - 1]',name = "Second order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
 layout = Layout(title = "Linear advection equation", xaxis_title = "x", yaxis_title = "y", zaxis_title = "phi", colorbar = false)
 
 plot_phi = plot([trace1, trace2, trace3], layout)
 
 # Plot derivative
-trace1_d_x = surface(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
 
-trace1_d_y = surface(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
 
 plot_phi_d_x = plot([trace1_d_x])
 plot_phi_d_y = plot([trace1_d_y])
@@ -224,3 +228,4 @@ plot_phi_d_y = plot([trace1_d_y])
 p = [plot_phi; plot_phi_d_x plot_phi_d_y]
 relayout!(p, width=800, height=1000)
 p
+

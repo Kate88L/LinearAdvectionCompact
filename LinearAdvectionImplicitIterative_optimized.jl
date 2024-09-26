@@ -4,24 +4,26 @@ using LinearAlgebra
 using PlotlyJS
 using CSV 
 using DataFrames
+using JSON
 
 include("Utils/InitialFunctions.jl")
 include("Utils/ExactSolutions.jl")
+include("Utils/Utils.jl")
 
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
+level = 3;
 
-K = 3; # Number of iterations for the second order correction
+K = 2; # Number of iterations for the second order correction
 
 # Courant number
-C = 1;
+C = 5;
 
 # Grid settings
-xL = 0 # - 1 * π / 2
+xL = -1  # - 1 * π / 2
 xR = 1.5 # 3 * π / 2
-Nx = 80 * 2^level
+Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
@@ -32,8 +34,8 @@ u(x) = 1
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = cos.(x);
-# phi_0(x) = exp.(-10*(x+0)^2);
-phi_0(x) = piecewiseLinear(x);
+phi_0(x) = exp.(-10*(x+0)^2);
+# phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
@@ -82,11 +84,14 @@ ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
 ϵ = 1e-16;
-ω0 = 0/4;
-α0 = 0/4;
+ω0 = 0;
+α0 = 0;
 
 ω = zeros(Nx + 1) .+ ω0;
 α = zeros(Nx + 1) .+ α0;
+
+l = zeros(Nx + 1)
+s = zeros(Nx + 1)
 
 # Initial old solution
 phi_old = ghost_point_time
@@ -141,8 +146,16 @@ for n = 1:Ntau
 
         for i = 2:1:Nx + 1
 
-            ω[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]), 0, 1)
-            α[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n]), 0, 1)
+            # ω[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]), 0, 1)
+            # α[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n]), 0, 1)
+
+            # U = ω0 * ( 1 / ( ϵ + (phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left)^2 )^2 );
+            # D = ( 1 - ω0 ) * ( 1 / ( ϵ + (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])^2 )^2 );
+            # ω[i] = U / ( U + D );
+
+            # U = α0 * ( 1 / ( ϵ + (phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i])^2 )^2 );
+            # D = ( 1 - α0 ) * ( 1 / ( ϵ + ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])^2 )^2 );
+            # α[i] = U / ( U + D );
 
             phi2[i, n + 1] =  ( phi2[i, n] 
                 - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
@@ -167,6 +180,14 @@ end
 # Print error
 Error_t_h = tau * h * sum(abs(phi2[i, n] - phi_exact.(x[i], (n-1)*tau)) for n in 1:Ntau+1 for i in 1:Nx+1)
 println("Error t*h: ", Error_t_h)
+
+# Load the last error
+last_error = load_last_error()
+if last_error != nothing
+    println("Order: ", log(2, last_error / Error_t_h))
+end 
+# Save the last error
+save_last_error(Error_t_h)
 println("=============================")
 
 # Compute TVD property of the derivative
@@ -218,14 +239,11 @@ layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = 
 
 plod_d_phi = plot([trace1_d, trace2_d], layout_d)
 
-# Plot TVD
-trace_ω = scatter(x = x, y = ω, mode = "lines", name = "ω", line=attr(color="firebrick", width=2))
-trace_α = scatter(x = x, y = α, mode = "lines", name = "α", line=attr(color="royalblue", width=2))
-trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
-trace_tvd_1 = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD_1, mode = "lines", name = "TVD first order", line=attr(color="royalblue", width=2))
-layout_tvd = Layout(title = "TVD")
-plot_tvd = plot([trace_ω, trace_α], layout_tvd)
-
+# Plot omega and alpha
+trace_ω = scatter(x = x[1:Nx+1], y = ω[1:Nx+1], mode = "lines", name = "ω")
+trace_α = scatter(x = x[1:Nx+1], y = α[1:Nx+1], mode = "lines", name = "α")
+layout_ωα = Layout(title = "ω and α")
+plot_ωα = plot([trace_ω, trace_α], layout_ωα)
 
 p = [plot_phi; plod_d_phi]
 relayout!(p, width = 1000, height = 500)

@@ -11,17 +11,17 @@ include("Utils/ExactSolutions.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 0;
 
-K = 3; # Number of iterations for the second order correction
+K = 2; # Number of iterations for the second order correction
 
-# Courant like number
+# Courant number
 C = 5;
 
 # Grid settings
-xL = -1 # - 1 * π / 2
-xR = 1 # 3 * π / 2
-Nx = 80 * 2^level
+xL = 0 # - 1 * π / 2
+xR = 1.5 # 3 * π / 2
+Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
@@ -32,8 +32,8 @@ u(x) = 1
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
 # phi_0(x) = cos.(x);
-phi_0(x) = exp.(-10*(x+0)^2);
-# phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = exp.(-10*(x+0)^2);
+phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
@@ -42,7 +42,7 @@ phi_exact(x, t) = phi_0.(x - t);
 
 ## Comptutation
 
-# Grid initialization with ghost point on the right
+# Grid initialization with ghost point on the left and right
 x = range(xL, xR+h, length = Nx + 2)
 
 # Time
@@ -54,7 +54,7 @@ tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
 
-# Ntau = 16
+# Ntau = 1
 
 c = zeros(Nx+2) .+ u.(x) * tau / h
 
@@ -82,14 +82,19 @@ ghost_point_time = phi_exact.(x, -tau);
 
 # WENO parameters
 ϵ = 1e-16;
-ω0 = 0/4;
-α0 = 0/4;
+ω0 = 2/3;
+α0 = 2/3;
 
 ω = zeros(Nx + 1) .+ ω0;
 α = zeros(Nx + 1) .+ α0;
 
+l = zeros(Nx + 1)
+s = zeros(Nx + 1)
+
 # Initial old solution
 phi_old = ghost_point_time
+
+@time begin
 
 # Time Loop
 for n = 1:Ntau
@@ -97,73 +102,33 @@ for n = 1:Ntau
     global phi_old;
 
     # First iteration, second order correction at n+1
-    # First order predictors
+    phi_left = ghost_point_left[n + 1];
+    phi_left_future = ghost_point_left[n + 2];
+
     for i = 2:1:Nx + 2
 
+        # First order predictors
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
 
         # Nutne pre 2. rad:
         phi1[i, n + 0] = ( phi_old[i] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n] ) / ( 1 + abs(c[i]) );
         phi1[i, n + 1] = ( phi1[i, n] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
         phi1[i, n + 2] = ( phi1[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 2] ) / ( 1 + abs(c[i]) );
-        phi1[i, n + 3] = ( phi1[i, n + 2] + abs(c[i]) * (c[i] > 0) * phi1[i - 1, n + 3] ) / ( 1 + abs(c[i]) );
-    end
 
-    # First iteration, it should be already 2nd order accurate:
-    for i = 2:1:Nx + 1
-
-        if i > 2
-            phi_left = phi1[i - 2, n + 1];
-        else
-            phi_left = ghost_point_left[n + 1];
-        end
-
-        # ENO parameter (0 - upwind, 1 - central)
-        if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
-            ω[i] = 0
-        else
-            ω[i] = 0
-        end
-
-        if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
-            α[i] = 0
-        else
-            α[i] = 0
-        end
-    
+        # First iteration, it should be already 2nd order accurate:
         phi2[i, n + 1] =  ( phi2[i, n] 
-            - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
-            - ( 1 - α[i] ) / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
+            - 1 / 2 * ( phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i] ) 
             + c[i] * ( phi2[i-1, n + 1] 
-            - ( ω[i] / 2 )* (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]) 
-        - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
+            - 1 / 2 * ( phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) ) ) / (1 + c[i]);
 
-        # Preparation for the 2nd iteration, second order correction at n+2
-        if i > 2
-            phi_left = phi1[i - 2, n + 2];
-        else
-            phi_left = ghost_point_left[n + 2];
-        end
-
-        # ENO parameter (0 - upwind, 1 - central)
-        if abs(phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) <= abs(phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2])
-            ω[i] = 0
-        else
-            ω[i] = 0
-        end    
-
-        if abs(phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n]) <= abs( phi1[i, n + 3] - 2*phi1[i, n + 2] + phi1[i, n + 1])
-            α[i] = 0
-        else
-            α[i] = 0
-        end
-    
+        # Preparation for the 2nd iteration, second order correction at n+2  
         phi2[i, n + 2] =  ( phi2[i, n + 1] 
-            - α[i] / 2 * ( phi1[i, n + 3] - 2*phi1[i, n + 2] + phi1[i, n + 1] ) 
-            - ( 1 - α[i] ) / 2 * ( phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n] ) 
+            - 1 / 2 * ( phi1[i, n + 2] - 2 * phi1[i, n + 1] + phi1[i, n] ) 
             + c[i] * ( phi2[i-1, n + 2] 
-            - ( ω[i] / 2 )* (phi1[i + 1, n + 2] - 2*phi1[i, n + 2] + phi1[i - 1, n + 2]) 
-        - ( (1 - ω[i]) / 2 )* ( phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left) ) ) / (1 + c[i]);
+            - 1 / 2 * ( phi1[i, n + 2] - 2 * phi1[i - 1, n + 2] + phi_left_future) ) ) / (1 + c[i]);
+
+        phi_left = phi1[i - 1, n + 1];
+        phi_left_future = phi1[i - 1, n + 2];    
     end
 
     phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
@@ -175,25 +140,20 @@ for n = 1:Ntau
         phi1[:, n + 1] = phi2[:, n + 1];
         phi1[:, n + 2] = phi2[:, n + 2];
 
+        phi_left = ghost_point_left[n + 1];
+
         for i = 2:1:Nx + 1
-            if i > 2
-                phi_left = phi2[i - 2, n + 1];
-            else
-                phi_left = ghost_point_left[n + 1];
-            end
 
-            # ENO parameter (0 - upwind, 1 - central)
-            if abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])
-                ω[i] = 0
-            else
-                ω[i] = 1
-            end
+            ω[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]), 0, 1)
+            α[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n]), 0, 1)
 
-            if abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])
-                α[i] = 0
-            else
-                α[i] = 1
-            end
+            # U = ω0 * ( 1 / ( ϵ + (phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left)^2 )^2 );
+            # D = ( 1 - ω0 ) * ( 1 / ( ϵ + (phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1])^2 )^2 );
+            # ω[i] = U / ( U + D );
+
+            # U = α0 * ( 1 / ( ϵ + (phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i])^2 )^2 );
+            # D = ( 1 - α0 ) * ( 1 / ( ϵ + ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n])^2 )^2 );
+            # α[i] = U / ( U + D );
 
             phi2[i, n + 1] =  ( phi2[i, n] 
                 - α[i] / 2 * ( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n] ) 
@@ -204,11 +164,15 @@ for n = 1:Ntau
 
             phi2[i, n + 2] = ( phi2[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi2[i - 1, n + 2] ) / ( 1 + abs(c[i]) );
 
-            phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
+            phi_left = phi2[i - 1, n + 1];
         end
+        phi2[Nx + 2, n + 1] = 3*phi2[Nx + 1, n + 1] - 3*phi2[Nx + 0, n + 1] + phi2[Nx - 1, n + 1];
+
     end
     # Update old solution
     phi_old = phi2[:, n];
+end
+
 end
 
 # Print error
@@ -265,15 +229,12 @@ layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = 
 
 plod_d_phi = plot([trace1_d, trace2_d], layout_d)
 
-# Plot TVD
-trace_ω = scatter(x = x, y = ω, mode = "lines", name = "ω", line=attr(color="firebrick", width=2))
-trace_α = scatter(x = x, y = α, mode = "lines", name = "α", line=attr(color="royalblue", width=2))
-trace_tvd = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD, mode = "lines", name = "TVD", line=attr(color="firebrick", width=2))
-trace_tvd_1 = scatter(x = range(0, Ntau, length = Ntau + 1), y = TVD_1, mode = "lines", name = "TVD first order", line=attr(color="royalblue", width=2))
-layout_tvd = Layout(title = "TVD")
-plot_tvd = plot([trace_ω, trace_α], layout_tvd)
+# Plot omega and alpha
+trace_ω = scatter(x = x[1:Nx+1], y = ω[1:Nx+1], mode = "lines", name = "ω")
+trace_α = scatter(x = x[1:Nx+1], y = α[1:Nx+1], mode = "lines", name = "α")
+layout_ωα = Layout(title = "ω and α")
+plot_ωα = plot([trace_ω, trace_α], layout_ωα)
 
-
-p = [plot_phi; plod_d_phi]
+p = [plot_phi; plod_d_phi; plot_ωα]
 relayout!(p, width = 1000, height = 500)
 p

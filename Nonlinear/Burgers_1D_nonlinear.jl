@@ -21,7 +21,7 @@ H(x) = ( x.^2 ) / 2.0
 xL = 0 # -2
 xR = 1 # 2
 
-level = 4 # Level of refinement
+level = 3 # Level of refinement
 Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
@@ -89,7 +89,7 @@ ghost_point_left = phi_exact[1, 3:end-1]
 ghost_point_time = phi_exact[2:end-1, 1]
 
 # WENO parameters
-ϵ = 1e-14;
+ϵ = 1e-7;
 ω0 = 1/3;
 α0 = 1/3;
 
@@ -129,77 +129,83 @@ for n = 1:Nτ
         phi_predictor_i[i, n + 1] = newtonMethod(firstOrderPredictor, x -> (firstOrderPredictor(x + ϵ) - firstOrderPredictor(x)) / ϵ, phi[i, n])
         phi_predictor_n[i, n + 1] = newtonMethod(firstOrderPredictor_n, x -> (firstOrderPredictor_n(x + ϵ) - firstOrderPredictor_n(x)) / ϵ, phi_predictor_n[i, n])
 
-        if i < Nx + 1
-            phi_right = phi[i + 1, n]
-        else
-            phi_right = ghost_point_right[n]
+        for p = 1 : 2
+
+            if i < Nx + 1
+                phi_right = phi[i + 1, n]
+            else
+                phi_right = ghost_point_right[n]
+            end
+
+            if i > 2
+                phi_left = phi[i - 2, n + 1];
+            else
+                phi_left = ghost_point_left[n];
+            end
+
+            # phi_predictor_n2[i - 1, n + 1] = phi_exact[i, n+2]
+            # phi_predictor_n[:, :] = phi_exact[2:end-1, 2:end-1]
+
+            # Correction
+            r_downwind_i = - phi[i, n] + phi_predictor_i[i - 1, n + 1] - phi_predictor_i[i, n + 1] + phi_right;
+            r_downwind_n = phi_predictor_n[i, n] - phi_predictor_n[i - 1, n + 1] - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
+
+            r_upwind_i = - phi[i - 1, n] + phi_left + phi[i, n] - phi[i - 1, n + 1];
+            r_upwind_n = phi[i - 1, n + 1] - phi[i, n] - phi[i - 1, n] + phi_old[i];
+
+            # WENO SHU
+            # U = ω0 * ( 1 / ( ϵ + r_upwind_i^2 )^2 );
+            # D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i^2 )^2 );
+            # ω[i] = U / ( U + D );
+
+            # U = α0 * ( 1 / ( ϵ + r_upwind_n^2 )^2 );
+            # D = ( 1 - α0 ) * ( 1 / ( ϵ + r_downwind_n^2 )^2 );
+            # α[i] = U / ( U + D );
+
+            # ENO
+            if (abs(r_downwind_i) + ϵ) < (abs(r_upwind_i) + ϵ)
+                ω[i] = 0;
+            else
+                ω[i] = 1;
+            end
+
+            if (abs(r_downwind_n) + ϵ) < (abs(r_upwind_n) + ϵ)
+                α[i] = 0;
+            else
+                α[i] = 1;
+            end
+
+            # Final scheme 
+            function secondOrderScheme(u)
+
+                first_order_term = (u - phi[i - 1, n + 1]) / h;
+                second_order_term_i = ( ( 1 - ω[i] ) * r_downwind_i + ω[i] * r_upwind_i ) / (2 * h);
+                second_order_term_n = ( ( 1 - α[i] ) * r_downwind_n + α[i] * r_upwind_n ) / (2 * τ);
+
+                # Compute derivative of phi_predictor_i
+                ∂x_phi = i > 1 ? (phi_predictor_i[i, n] - phi_predictor_i[i - 1, n]) / h : (phi_predictor_i[i + 1, n] - phi_predictor_i[i, n]) / h;
+
+                C = ∂x_phi * τ / h;
+
+                # if C > 1 
+                    # println("CFL condition not satisfied for x[i] = ", x[i], " and t = ", n * τ)
+                # end
+
+                A = min(1, C) / C;
+                B = max(0, C - A) / C;
+
+                A = C <= 1 ? 1 : 0;
+                B = C < 1 ? 0 : 1;
+
+                # println("second_order_term: ", second_order_term)
+                return ( u - phi[i, n] ) / τ + B * second_order_term_n + H( first_order_term + A * second_order_term_i )
+            end
+
+            phi[i, n + 1] = newtonMethod(secondOrderScheme, x -> (secondOrderScheme(x + ϵ) - secondOrderScheme(x)) / ϵ, phi[i, n]);
+
+            phi_predictor_i[i, n + 1] = phi[i, n + 1];
+            phi_predictor_n[i, n + 1] = phi[i, n + 1];
         end
-
-        if i > 2
-            phi_left = phi[i - 2, n + 1];
-        else
-            phi_left = ghost_point_left[n];
-        end
-
-        # phi_predictor_n2[i - 1, n + 1] = phi_exact[i, n+2]
-        # phi_predictor_n[:, :] = phi_exact[2:end-1, 2:end-1]
-
-        # Correction
-        r_downwind_i = - phi[i, n] + phi_predictor_i[i - 1, n + 1] - phi_predictor_i[i, n + 1] + phi_right;
-        r_downwind_n = phi_predictor_n[i, n] - phi_predictor_n[i - 1, n + 1] - phi_predictor_n[i, n + 1] + phi_predictor_n2[i - 1, n + 1];
-
-        r_upwind_i = - phi[i - 1, n] + phi_left + phi[i, n] - phi[i - 1, n + 1];
-        r_upwind_n = phi[i - 1, n + 1] - phi[i, n] - phi[i - 1, n] + phi_old[i];
-
-        # WENO SHU
-        U = ω0 * ( 1 / ( ϵ + r_upwind_i^2 )^2 );
-        D = ( 1 - ω0 ) * ( 1 / ( ϵ + r_downwind_i^2 )^2 );
-        ω[i] = U / ( U + D );
-
-        U = α0 * ( 1 / ( ϵ + r_upwind_n^2 )^2 );
-        D = ( 1 - α0 ) * ( 1 / ( ϵ + r_downwind_n^2 )^2 );
-        α[i] = U / ( U + D );
-
-        # ENO
-        # if (abs(r_downwind_i) + ϵ) < (abs(r_upwind_i) + ϵ)
-        #     ω[i] = 0;
-        # else
-        #     ω[i] = 1;
-        # end
-
-        # if (abs(r_downwind_n) + ϵ) < (abs(r_upwind_n) + ϵ)
-        #     α[i] = 0;
-        # else
-        #     α[i] = 1;
-        # end
-
-        # Final scheme 
-        function secondOrderScheme(u)
-
-            first_order_term = (u - phi[i - 1, n + 1]) / h;
-            second_order_term_i = ( ( 1 - ω[i] ) * r_downwind_i + ω[i] * r_upwind_i ) / (2 * h);
-            second_order_term_n = ( ( 1 - α[i] ) * r_downwind_n + α[i] * r_upwind_n ) / (2 * τ);
-
-            # Compute derivative of phi_predictor_i
-            ∂x_phi = i > 1 ? (phi_predictor_i[i, n] - phi_predictor_i[i - 1, n]) / h : (phi_predictor_i[i + 1, n] - phi_predictor_i[i, n]) / h;
-
-            C = ∂x_phi * τ / h;
-
-            # if C > 1 
-                # println("CFL condition not satisfied for x[i] = ", x[i], " and t = ", n * τ)
-            # end
-
-            A = min(1, C) / C;
-            B = max(0, C - A) / C;
-
-            A = C <= 1 ? 1 : 0;
-            B = C < 1 ? 0 : 1;
-
-            # println("second_order_term: ", second_order_term)
-            return ( u - phi[i, n] ) / τ + B * second_order_term_n + H( first_order_term + A * second_order_term_i )
-        end
-
-        phi[i, n + 1] = newtonMethod(secondOrderScheme, x -> (secondOrderScheme(x + ϵ) - secondOrderScheme(x)) / ϵ, phi[i, n]);
 
         function futureFirstOrderPredictor_n(u)
             return u - phi[i, n + 1] + τ * H( (u - phi_predictor_n2[i - 1, n + 1]) / h )

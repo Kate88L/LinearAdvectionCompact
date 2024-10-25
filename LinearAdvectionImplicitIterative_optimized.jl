@@ -18,30 +18,30 @@ level = 4;
 K = 1; # Number of iterations for the second order correction
 
 # Courant number
-C = 5;
+C = 15;
 
 # Grid settings
-xL = - 1 * π / 2
-xR = 3 * π / 2
+xL = 0 # - 1 * π / 2
+xR = 1.5 # 3 * π / 2
 Nx = 150 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
 # u(x) = 1 + 3/4 * cos(x)
-u(x) = 2 + 3/2 * cos(x)
-# u(x) = 1
+# u(x) = 2 + 3/2 * cos(x)
+u(x) = 1
 
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
-phi_0(x) = cos.(x);
+# phi_0(x) = cos.(x);
 # phi_0(x) = 0. + (x - 4.)^2
 # phi_0(x) = exp.(-10*(x+0)^2);
-# phi_0(x) = piecewiseLinear(x);
+phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
-phi_exact(x, t) = cosVelocitySmooth(x, t);
-# phi_exact(x, t) = phi_0.(x - t);             
+# phi_exact(x, t) = cosVelocitySmooth(x, t);
+phi_exact(x, t) = phi_0.(x - t);             
 
 ## Comptutation
 
@@ -50,7 +50,7 @@ x = range(xL-h, xR+h, length = Nx + 3)
 
 # Time
 # T = 1 * π / sqrt(7) * 2 / 10
-T = π / sqrt(3)
+T = π / sqrt(3)/4
 # tau = C * h / u
 Ntau = 1 * 2^level
 # Ntau = Int(round(Nx / 15 / C + 1))
@@ -96,8 +96,8 @@ phi_first_order[2, :] = phi_exact.(x[2], t);
 ω0 = 0;
 α0 = 0;
 
-ω = zeros(Nx + 3) .+ ω0;
-α = zeros(Nx + 3) .+ α0;
+ω = zeros(Nx + 3, Ntau + 3) .+ ω0;
+α = zeros(Nx + 3, Ntau + 3) .+ α0;
 
 @time begin
 
@@ -163,12 +163,12 @@ for n = 2:Ntau + 1
             ru_n = phi2[i, n + 1] - phi[i, n] - phi2[i, n] + phi[i, n - 1] 
             ru_i = phi2[i, n + 1] - phi[i - 1, n + 1] - phi2[i - 1, n + 1] + phi[i - 2, n + 1];
 
-            # ω[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i - 1, n + 1] + phi_left) <= abs(phi1[i + 1, n + 1] - 2*phi1[i, n + 1] + phi1[i - 1, n + 1]), 0, 1)
-            # α[i] = ifelse( abs(phi1[i, n + 1] - 2 * phi1[i, n] + phi_old[i]) <= abs( phi1[i, n + 2] - 2*phi1[i, n + 1] + phi1[i, n]), 0, 1)
+            ω[i,n+1] = ifelse( abs(ru_i) < abs(rd_i), 1, 0); # Option 0 always gives 3d order
+            α[i,n+1] = ifelse( abs(ru_n) < abs(rd_n), 1, 0);
 
             phi[i, n + 1] =  ( phi[i, n] 
-                - α[i] / 2 * ru_n - ( 1 - α[i] ) / 2 * rd_n
-                + c[i] * ( phi[i - 1, n + 1] - ω[i] / 2 *  ru_i - (1 - ω[i]) / 2 * rd_i ) ) / (1 + c[i]);
+                - α[i,n+1] / 2 * ru_n - ( 1 - α[i,n+1] ) / 2 * rd_n
+                + c[i] * ( phi[i - 1, n + 1] - ω[i,n+1] / 2 *  ru_i - (1 - ω[i,n+1]) / 2 * rd_i ) ) / (1 + c[i]);
         end
         phi[Nx + 3, n + 1] = 3*phi[Nx + 2, n + 1] - 3*phi[Nx + 1, n + 1] + phi[Nx, n + 1];
         phi1[Nx + 3, n + 1] = 3*phi1[Nx + 2, n + 1] - 3*phi1[Nx + 1, n + 1] + phi1[Nx, n + 1];
@@ -224,8 +224,8 @@ layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = 
 plod_d_phi = plot([trace3_d, trace2_d, trace1_d], layout_d)
 
 # Plot omega and alpha
-trace_ω = scatter(x = x[1:Nx+1], y = ω[1:Nx+1], mode = "lines", name = "ω")
-trace_α = scatter(x = x[1:Nx+1], y = α[1:Nx+1], mode = "lines", name = "α")
+trace_ω = scatter(x = x, y = ω[:,end-1], mode = "lines", name = "ω")
+trace_α = scatter(x = x, y = α[:,end-1], mode = "lines", name = "α")
 layout_ωα = Layout(title = "ω and α")
 plot_ωα = plot([trace_ω, trace_α], layout_ωα)
 

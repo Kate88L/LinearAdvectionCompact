@@ -13,12 +13,12 @@ include("Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 6;
+level = 0;
 
 K = 1; # Number of iterations for the second order correction
 
 # Courant number
-C = 15;
+C = 1;
 
 # Grid settings
 xL = -0.5
@@ -58,6 +58,8 @@ tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
 
+Ntau = 2
+
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
 c = zeros(Nx+3) .+ u.(x) * tau / h
@@ -96,8 +98,10 @@ phi_first_order[2, :] = phi_exact.(x[2], t);
 ω0 = 0;
 α0 = 0;
 
-ω = zeros(Nx + 3) .+ ω0;
-α = zeros(Nx + 3) .+ α0;
+ω1 = zeros(Nx + 3) .+ ω0;
+ω2 = zeros(Nx + 3) .+ ω0;
+α1 = zeros(Nx + 3) .+ α0;
+α2 = zeros(Nx + 3) .+ α0;
 
 l = zeros(Nx + 3)
 s = zeros(Nx + 3)
@@ -119,26 +123,25 @@ for n = 2:Ntau + 1
 
     phi_i_predictor = ( phi[3, n] - 1/2 * ( -phi1[3, n] + phi[3 , n - 1] ) + c[3] * ( phi2[2, n + 1] - 1/2 * ( -phi1[2, n + 1] + phi[1, n + 1] ) ) ) / ( 1 + c[3] );
 
-    for i = 3:1:Nx + 2
+    for k = 1:K # Multiple correction iterations
+        for i = 3:1:Nx + 2
 
-        # First order solution
-        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c[i] * phi_first_order[i - 1, n + 1] ) / ( 1 + c[i] );
+            # First order solution
+            phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c[i] * phi_first_order[i - 1, n + 1] ) / ( 1 + c[i] );
 
-        phi2_i_old = phi2[i, n + 1];
-        phi2_i_old_p = phi_i_predictor;
+            phi2_i_old = phi2[i, n + 1];
+            phi2_i_old_p = phi_i_predictor;
 
-        # FIRST ITERATION 
-        phi1[i, n] = ( phi[i, n - 1] + c[i] * phi[i - 1, n] ) / ( 1 + c[i] );
-        phi1[i - 1, n + 1] = ( phi[i - 1, n] + c[i - 1] * phi[i - 2, n + 1] ) / ( 1 + c[i - 1] );
-        phi1[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] ) / ( 1 + c[i] );
+            # FIRST ITERATION 
+            phi1[i, n] = ( phi[i, n - 1] + c[i] * phi[i - 1, n] ) / ( 1 + c[i] );
+            phi1[i - 1, n + 1] = ( phi[i - 1, n] + c[i - 1] * phi[i - 2, n + 1] ) / ( 1 + c[i - 1] );
+            phi1[i, n + 1] = ( phi[i, n] + c[i] * phi[i - 1, n + 1] ) / ( 1 + c[i] );
 
-        phi[i, n + 1] =  ( phi[i, n] 
-            - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) 
-            + c[i] * ( phi[i - 1, n + 1] 
-            - 1 / 2 * ( phi1[i, n + 1] - phi[i - 1, n + 1] - phi1[i - 1, n + 1] + phi[i - 2, n + 1]) ) ) / (1 + c[i]);
-
-        for k = 1:K # Multiple correction iterations
-            
+            phi[i, n + 1] =  ( phi[i, n] 
+                - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) 
+                + c[i] * ( phi[i - 1, n + 1] 
+                - 1 / 2 * ( phi1[i, n + 1] - phi[i - 1, n + 1] - phi1[i - 1, n + 1] + phi[i - 2, n + 1]) ) ) / (1 + c[i]);
+                
             phi2[i, n + 1] = phi[i, n + 1];
 
             # Compute second order predictor for i + 1
@@ -166,34 +169,21 @@ for n = 2:Ntau + 1
             ru_n = phi2[i, n + 1] - phi[i, n] - phi2[i, n] + phi[i, n - 1] 
             ru_i = phi2[i, n + 1] - phi[i - 1, n + 1] - phi2[i - 1, n + 1] + phi[i - 2, n + 1];
 
-            ω[i] = ifelse( abs(ru_i) < abs(rd_i), 1, 0)
-            α[i] = ifelse( abs(ru_n) < abs(rd_n), 1, 0)
+            ω1[i] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0) * ifelse( ru_i * rd_i > 0, 1, 0)
+            α1[i] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0) * ifelse( ru_n * rd_n > 0, 1, 0)
 
-            # ϵ_d = 1e-4
-
-            # smooth_indicator = ifelse(abs(ru_i - rd_i) < ϵ_d && abs(ru_n - rd_n) < ϵ_d, 0, 1)
-
-            # # Define ω weights
-            # ω0 = 1/3
-            # U = ω0 * smooth_indicator * (1 / (ϵ + ru_i^2)^2)
-            # D = (1 - ω0) * smooth_indicator * (1 / (ϵ + rd_i^2)^2)
-            # ω[i] = ifelse(smooth_indicator == 0, 0, U / (U + D))
-            
-            # # Define α weights
-            # α0 = 1/3
-            # U_alpha = α0 * smooth_indicator * (1 / (ϵ + ru_n^2)^2)
-            # D_alpha = (1 - α0) * smooth_indicator * (1 / (ϵ + rd_n^2)^2)
-            # α[i] = ifelse(smooth_indicator == 0, 0, U_alpha / (U_alpha + D_alpha))
-            
+            ω2[i] = ( 1 - ω1[i] ) * ifelse( ru_i * rd_i > 0, 1, 0);
+            α2[i] = ( 1 - α1[i] ) * ifelse( ru_n * rd_n > 0, 1, 0);     
 
             phi[i, n + 1] =  ( phi[i, n] 
-                - α[i,n+1] / 2 * ru_n - ( 1 - α[i,n+1] ) / 2 * rd_n
-                + c[i] * ( phi[i - 1, n + 1] - ω[i,n+1] / 2 *  ru_i - (1 - ω[i,n+1]) / 2 * rd_i ) ) / (1 + c[i]);
+                - α1[i] / 2 * ru_n - α2[i] / 2 * rd_n
+                + c[i] * ( phi[i - 1, n + 1] - ω1[i] / 2 *  ru_i - ω2[i] / 2 * rd_i ) ) / (1 + c[i]);
+
+            phi[Nx + 3, n + 1] = 3*phi[Nx + 2, n + 1] - 3*phi[Nx + 1, n + 1] + phi[Nx, n + 1];
+            phi1[Nx + 3, n + 1] = 3*phi1[Nx + 2, n + 1] - 3*phi1[Nx + 1, n + 1] + phi1[Nx, n + 1];
+            phi_first_order[Nx + 3, n + 1] = 3*phi_first_order[Nx + 2, n + 1] - 3*phi_first_order[Nx + 1, n + 1] + phi_first_order[Nx, n + 1];
+            phi2[Nx + 3, n + 1] = 3*phi2[Nx + 2, n + 1] - 3*phi2[Nx + 1, n + 1] + phi2[Nx, n + 1];
         end
-        phi[Nx + 3, n + 1] = 3*phi[Nx + 2, n + 1] - 3*phi[Nx + 1, n + 1] + phi[Nx, n + 1];
-        phi1[Nx + 3, n + 1] = 3*phi1[Nx + 2, n + 1] - 3*phi1[Nx + 1, n + 1] + phi1[Nx, n + 1];
-        phi_first_order[Nx + 3, n + 1] = 3*phi_first_order[Nx + 2, n + 1] - 3*phi_first_order[Nx + 1, n + 1] + phi_first_order[Nx, n + 1];
-        phi2[Nx + 3, n + 1] = 3*phi2[Nx + 2, n + 1] - 3*phi2[Nx + 1, n + 1] + phi2[Nx, n + 1];
     end
 end
 
@@ -248,10 +238,10 @@ layout_d = Layout(title = "Linear advection equation - Gradient", xaxis_title = 
 plod_d_phi = plot([trace3_d, trace2_d, trace1_d], layout_d)
 
 # Plot omega and alpha
-trace_ω = scatter(x = x, y = ω[:,end-1], mode = "lines", name = "ω")
-trace_α = scatter(x = x, y = α[:,end-1], mode = "lines", name = "α")
-layout_ωα = Layout(title = "ω and α")
-plot_ωα = plot([trace_ω, trace_α], layout_ωα)
+# trace_ω = scatter(x = x, y = ω, mode = "lines", name = "ω")
+# trace_α = scatter(x = x, y = α, mode = "lines", name = "α")
+# layout_ωα = Layout(title = "ω and α")
+# plot_ωα = plot([trace_ω, trace_α], layout_ωα)
 
 p = [plot_phi; plod_d_phi]
 relayout!(p, width = 1000, height = 500)

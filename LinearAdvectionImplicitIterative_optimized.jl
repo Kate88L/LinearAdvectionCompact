@@ -13,7 +13,7 @@ include("Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 4;
+level = 6;
 
 K = 1; # Number of iterations for the second order correction
 
@@ -21,8 +21,8 @@ K = 1; # Number of iterations for the second order correction
 C = 15;
 
 # Grid settings
-xL = 0 # - 1 * π / 2
-xR = 1.5 # 3 * π / 2
+xL = -0.5
+xR = 1.5
 Nx = 150 * 2^level
 h = (xR - xL) / Nx
 
@@ -50,7 +50,7 @@ x = range(xL-h, xR+h, length = Nx + 3)
 
 # Time
 # T = 1 * π / sqrt(7) * 2 / 10
-T = π / sqrt(3)/4
+T = 1 * π / sqrt(7) * 2 / 10
 # tau = C * h / u
 Ntau = 1 * 2^level
 # Ntau = Int(round(Nx / 15 / C + 1))
@@ -96,8 +96,11 @@ phi_first_order[2, :] = phi_exact.(x[2], t);
 ω0 = 0;
 α0 = 0;
 
-ω = zeros(Nx + 3, Ntau + 3) .+ ω0;
-α = zeros(Nx + 3, Ntau + 3) .+ α0;
+ω = zeros(Nx + 3) .+ ω0;
+α = zeros(Nx + 3) .+ α0;
+
+l = zeros(Nx + 3)
+s = zeros(Nx + 3)
 
 @time begin
 
@@ -163,8 +166,25 @@ for n = 2:Ntau + 1
             ru_n = phi2[i, n + 1] - phi[i, n] - phi2[i, n] + phi[i, n - 1] 
             ru_i = phi2[i, n + 1] - phi[i - 1, n + 1] - phi2[i - 1, n + 1] + phi[i - 2, n + 1];
 
-            ω[i,n+1] = ifelse( abs(ru_i) < abs(rd_i), 1, 0); # Option 0 always gives 3d order
-            α[i,n+1] = ifelse( abs(ru_n) < abs(rd_n), 1, 0);
+            ω[i] = ifelse( abs(ru_i) < abs(rd_i), 1, 0)
+            α[i] = ifelse( abs(ru_n) < abs(rd_n), 1, 0)
+
+            # ϵ_d = 1e-4
+
+            # smooth_indicator = ifelse(abs(ru_i - rd_i) < ϵ_d && abs(ru_n - rd_n) < ϵ_d, 0, 1)
+
+            # # Define ω weights
+            # ω0 = 1/3
+            # U = ω0 * smooth_indicator * (1 / (ϵ + ru_i^2)^2)
+            # D = (1 - ω0) * smooth_indicator * (1 / (ϵ + rd_i^2)^2)
+            # ω[i] = ifelse(smooth_indicator == 0, 0, U / (U + D))
+            
+            # # Define α weights
+            # α0 = 1/3
+            # U_alpha = α0 * smooth_indicator * (1 / (ϵ + ru_n^2)^2)
+            # D_alpha = (1 - α0) * smooth_indicator * (1 / (ϵ + rd_n^2)^2)
+            # α[i] = ifelse(smooth_indicator == 0, 0, U_alpha / (U_alpha + D_alpha))
+            
 
             phi[i, n + 1] =  ( phi[i, n] 
                 - α[i,n+1] / 2 * ru_n - ( 1 - α[i,n+1] ) / 2 * rd_n
@@ -187,6 +207,10 @@ println("Error t*h first order: ", Error_t_h_1)
 
 # Error_t_h = h * sum(abs(phi[i, end-1] - phi_exact.(x[i], t[end-1])) for i in 2:Nx+2)
 # println("Error h: ", Error_t_h)
+
+# Print maximum and minimum of the derivative
+println("Max derivative: ", maximum(diff(phi[:, end-1]) / h))
+println("Min derivative: ", minimum(diff(phi[:, end-1]) / h))
 
 # Load the last error
 last_error = load_last_error()

@@ -13,9 +13,9 @@ include("../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 0;
 
-K = 5; # Number of iterations for the second order correction
+K = 1 # Number of iterations for the second order correction
 
 # Courant number
 C = 1;
@@ -82,7 +82,6 @@ phi[:, :, 2] = phi_exact.(X, Y, tau);
 phi_first_order[:, :, 2] = phi_exact.(X, Y, tau);
 
 phi_i_predictor = zeros(N + 3)
-phi2_i_old_p = zeros(N + 3)
 
 # Boundary conditions
 for n = 2:Ntau + 3
@@ -136,15 +135,13 @@ end
 
 # Time Loop
 for n = 2:Ntau + 1
-
     for j = 3:1:N+2
         phi_i_predictor[j] = ( phi[3, j, n] - 1/2 * ( -phi1[3, j, n] + phi[3, j, n - 1] ) + c[3, j] * ( phi2[2, j, n + 1] - 1/2 * ( -phi1[2, j, n + 1] + phi[1, j, n + 1] ) ) 
-                                                                                          + d[3, j] * ( phi2[3, j - 1, n + 1] - 1/2 * ( -phi1[3, j - 1, n + 1] + phi[3, j - 2, n + 1] ) )) / ( 1 + c[3, j] + d[3, j]);
+        + d[3, j] * ( phi2[3, j - 1, n + 1] - 1/2 * ( -phi1[3, j - 1, n + 1] + phi[3, j - 2, n + 1] ) )) / ( 1 + c[3, j] + d[3, j]);
     end
-
-    for i = 3:1:N + 2
+    for i = 3:1:N + 2      
         phi_j_predictor = ( phi[i, 3, n] - 1/2 * ( -phi1[i, 3, n] + phi[i, 3, n - 1] ) + c[i, 3] * ( phi2[i - 1, 3, n + 1] - 1/2 * ( -phi1[i - 1, 3, n + 1] + phi[i - 2, 3, n + 1] ) ) 
-                                                                                       + d[i, 3] * ( phi2[i, 2, n + 1] - 1/2 * ( -phi1[i , 2, n + 1] + phi[i, 1, n + 1] ) ) ) / ( 1 + c[i, 3] + d[i, 3] );
+        + d[i, 3] * ( phi2[i, 2, n + 1] - 1/2 * ( -phi1[i , 2, n + 1] + phi[i, 1, n + 1] ) ) ) / ( 1 + c[i, 3] + d[i, 3] );   
     for j = 3:1:N + 2
 
         # First order solution
@@ -152,7 +149,7 @@ for n = 2:Ntau + 1
                                                                   + d[i, j] * phi_first_order[i, j - 1, n + 1] ) / ( 1 + c[i, j] + d[i, j] );
 
         phi2_i_old = phi2[i, j, n + 1];
-        phi2_i_old_p[j] = phi_i_predictor[j];
+        phi2_i_old_p = phi_i_predictor[j];
         phi2_j_old_p = phi_j_predictor;
 
         # FIRST ITERATION 
@@ -203,37 +200,38 @@ for n = 2:Ntau + 1
             + d[i, j] * ( phi2[i, j - 1, n + 2]
             - 1 / 2 * ( phi1[i, j, n + 2] - phi2[i, j - 1, n + 2] - phi1[i, j - 1, n + 2] + phi2[i, j - 2, n + 2]) ) ) / (1 + c[i, j] + d[i, j]);
         
-            for k = 1:K # Multiple correction iterations
+        for k = 1:K # Multiple correction iterations
 
-                # SECOND ITERATION
-                rd_n = phi2[i, j, n + 2] - phi2[i, j, n + 1] - phi2_i_old + phi[i, j, n];
-                ru_n = phi2[i, j, n + 1] - phi[i, j, n] - phi2[i, j, n] + phi[i, j, n - 1] 
+            # SECOND ITERATION
+            rd_n = phi2[i, j, n + 2] - phi2[i, j, n + 1] - phi2_i_old + phi[i, j, n];
+            ru_n = phi2[i, j, n + 1] - phi[i, j, n] - phi2[i, j, n] + phi[i, j, n - 1] 
 
-                rd_i = phi_i_predictor[j] - phi2[i, j, n + 1] - phi2_i_old_p[j] + phi[i - 1, j, n + 1];
-                ru_i = phi2[i, j, n + 1] - phi[i - 1, j, n + 1] - phi2[i - 1, j, n + 1] + phi[i - 2, j, n + 1];
+            rd_i = phi_i_predictor[j] - phi2[i, j, n + 1] - phi2_i_old_p + phi[i - 1, j, n + 1];
+            ru_i = phi2[i, j, n + 1] - phi[i - 1, j, n + 1] - phi2[i - 1, j, n + 1] + phi[i - 2, j, n + 1];
 
-                rd_j = phi_j_predictor - phi2[i, j, n + 1] - phi2_j_old_p + phi[i, j - 1, n + 1];
-                ru_j = phi2[i, j, n + 1] - phi[i, j - 1, n + 1] - phi2[i, j - 1, n + 1] + phi[i, j - 2, n + 1];
+            rd_j = phi_j_predictor - phi2[i, j, n + 1] - phi2_j_old_p + phi[i, j - 1, n + 1];
+            ru_j = phi2[i, j, n + 1] - phi[i, j - 1, n + 1] - phi2[i, j - 1, n + 1] + phi[i, j - 2, n + 1];
 
-                ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
-                ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 1, 0)# * ifelse( ru_j * rd_j > 0, 1, 0)
-                α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
+            ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
+            ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 1, 0)# * ifelse( ru_j * rd_j > 0, 1, 0)
+            α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
 
-                ω2_i[i, j] = ( 1 - ω1_i[i, j] )# * ifelse( ru_i * rd_i > 0, 1, 0);
-                ω2_j[i, j] = ( 1 - ω1_j[i, j] )# * ifelse( ru_j * rd_j > 0, 1, 0);
-                α2[i, j] = ( 1 - α1[i, j] )# * ifelse( ru_n * rd_n > 0, 1, 0);     
+            ω2_i[i, j] = ( 1 - ω1_i[i, j] )# * ifelse( ru_i * rd_i > 0, 1, 0);
+            ω2_j[i, j] = ( 1 - ω1_j[i, j] )# * ifelse( ru_j * rd_j > 0, 1, 0);
+            α2[i, j] = ( 1 - α1[i, j] )# * ifelse( ru_n * rd_n > 0, 1, 0);     
 
-                phi[i, j, n + 1] =  ( phi[i, j, n] 
-                    - α1[i, j] / 2 * ru_n - α2[i, j] / 2 * rd_n
-                    + c[i, j] * ( phi[i - 1, j, n + 1] - ω1_i[i, j] / 2 *  ru_i - ω2_i[i, j] / 2 * rd_i ) 
-                    + d[i, j] * ( phi[i, j - 1, n + 1] - ω1_j[i, j] / 2 *  ru_j - ω2_j[i, j] / 2 * rd_j ) ) / (1 + c[i, j] + d[i, j]);
+            phi[i, j, n + 1] =  ( phi[i, j, n] 
+                - α1[i, j] / 2 * ru_n - α2[i, j] / 2 * rd_n
+                + c[i, j] * ( phi[i - 1, j, n + 1] - ω1_i[i, j] / 2 *  ru_i - ω2_i[i, j] / 2 * rd_i ) 
+                + d[i, j] * ( phi[i, j - 1, n + 1] - ω1_j[i, j] / 2 *  ru_j - ω2_j[i, j] / 2 * rd_j ) ) / (1 + c[i, j] + d[i, j]);
 
-                phi2_j_old = phi2[i, j, n + 1];
-                phi2_j_old_p = phi2[i, j, n + 1];
-                phi2_i_old_p[j] = phi2[i, j, n + 1];
-                phi2[i, j, n + 1] = phi[i, j, n + 1];
-            end
+            phi2_i_old = phi2[i, j, n + 1];
+            phi2_j_old_p = phi2[i, j, n + 1];
+            phi2_i_old_p = phi2[i, j, n + 1];
+            phi2[i, j, n + 1] = phi[i, j, n + 1];
+        end
     end
+
     end
     phi[N + 3, :, n + 1] = 3 * phi[N + 2, :, n + 1] - 3 * phi[N + 1, :, n + 1] + phi[N, :, n + 1];
     phi[:, N + 3, n + 1] = 3 * phi[:, N + 2, n + 1] - 3 * phi[:, N + 1, n + 1] + phi[:, N, n + 1];
@@ -271,8 +269,8 @@ println("Error t*h first order: ", Error_t_h_1)
 d_phi_x = zeros(N + 3, N + 3);
 d_phi_y = zeros(N + 3, N + 3);
 
-for i = 1:length(x)-1
-for j = 1:length(y)-1
+for i = 5:length(x)-5
+for j = 5:length(y)-5
    d_phi_x[i, j] = (phi[i + 1, j, end-1] - phi[i, j, end-1]) / h;
    d_phi_y[i, j] = (phi[i, j + 1, end-1] - phi[i, j, end-1]) / h;
 end
@@ -297,9 +295,9 @@ plot_phi = plot([ trace3, trace2], layout)
 plot_phi
 
 # Plot derivative
-trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+trace1_d_x = surface(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
 
-trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+trace1_d_y = surface(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
 
 plot_phi_d_x = plot([trace1_d_x])
 plot_phi_d_y = plot([trace1_d_y])

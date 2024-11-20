@@ -55,7 +55,7 @@ Ntau = 1 * 2^level
 tau = C * h / maximum(max(u.(x, y), v.(x, y)))
 Ntau = Int(round(Tfinal / tau))
 
-# Ntau = 1
+Ntau = 1
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
@@ -211,8 +211,8 @@ for n = 2:Ntau + 1
             rd_j = phi_j_predictor - phi2[i, j, n + 1] - phi2_j_old_p + phi[i, j - 1, n + 1];
             ru_j = phi2[i, j, n + 1] - phi[i, j - 1, n + 1] - phi2[i, j - 1, n + 1] + phi[i, j - 2, n + 1];
 
-            ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 1, 1)# * ifelse( ru_i * rd_i > 0, 1, 0)
-            ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 1, 1)# * ifelse( ru_j * rd_j > 0, 1, 0)
+            ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 0, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
+            ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 0, 0)# * ifelse( ru_j * rd_j > 0, 1, 0)
             α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 0, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
 
             ω2_i[i, j] = ( 1 - ω1_i[i, j] )# * ifelse( ru_i * rd_i > 0, 1, 0);
@@ -226,18 +226,28 @@ for n = 2:Ntau + 1
 
             phi2_i_old = phi2[i, j, n + 1];
             phi2_j_old_p = phi2[i, j, n + 1];
-            # phi2_i_old_p = phi2[i, j, n + 1];
+            phi2_i_old_p = phi2[i, j, n + 1];
             phi2[i, j, n + 1] = phi[i, j, n + 1];
         end
+        phi[N + 3, j, n + 1] = 3 * phi[N + 2, j, n + 1] - 3 * phi[N + 1, j, n + 1] + phi[N, j, n + 1];
+        phi[:, N + 3, n + 1] = 3 * phi[:, N + 2, n + 1] - 3 * phi[:, N + 1, n + 1] + phi[:, N, n + 1];
+        phi2[N + 3, j, n + 1] = 3 * phi2[N + 2, j, n + 1] - 3 * phi2[N + 1, j, n + 1] + phi2[N, j, n + 1];
+        phi2[:, N + 3, n + 1] = 3 * phi2[:, N + 2, n + 1] - 3 * phi2[:, N + 1, n + 1] + phi2[:, N, n + 1];
+        phi1[N + 3, j, n + 1] = 3 * phi1[N + 2, j, n + 1] - 3 * phi1[N + 1, j, n + 1] + phi1[N, j, n + 1];
+        phi1[:, N + 3, n + 1] = 3 * phi1[:, N + 2, n + 1] - 3 * phi1[:, N + 1, n + 1] + phi1[:, N, n + 1];
     end
+    # phi[i, N + 3, n + 1] = 3 * phi[i, N + 2, n + 1] - 3 * phi[i, N + 1, n + 1] + phi[i, N, n + 1];
+    # phi2[i, N + 3, n + 1] = 3 * phi2[i, N + 2, n + 1] - 3 * phi2[i, N + 1, n + 1] + phi2[i, N, n + 1];
+    # phi1[i, N + 3, n + 1] = 3 * phi1[i, N + 2, n + 1] - 3 * phi1[i, N + 1, n + 1] + phi1[i, N, n + 1];
+    # phi[N + 3, :, n + 1] = 3 * phi[N + 2, :, n + 1] - 3 * phi[N + 1, :, n + 1] + phi[N, :, n + 1];
+    # phi2[N + 3, :, n + 1] = 3 * phi2[N + 2, :, n + 1] - 3 * phi2[N + 1, :, n + 1] + phi2[N, :, n + 1];
+    # phi1[N + 3, :, n + 1] = 3 * phi1[N + 2, :, n + 1] - 3 * phi1[N + 1, :, n + 1] + phi1[N, :, n + 1];
 
     end
-    phi[N + 3, :, n + 1] = 3 * phi[N + 2, :, n + 1] - 3 * phi[N + 1, :, n + 1] + phi[N, :, n + 1];
-    phi[:, N + 3, n + 1] = 3 * phi[:, N + 2, n + 1] - 3 * phi[:, N + 1, n + 1] + phi[:, N, n + 1];
+        phi[N + 3, :, n + 1] = 3 * phi[N + 2, :, n + 1] - 3 * phi[N + 1, :, n + 1] + phi[N, :, n + 1];
     phi2[N + 3, :, n + 1] = 3 * phi2[N + 2, :, n + 1] - 3 * phi2[N + 1, :, n + 1] + phi2[N, :, n + 1];
-    phi2[:, N + 3, n + 1] = 3 * phi2[:, N + 2, n + 1] - 3 * phi2[:, N + 1, n + 1] + phi2[:, N, n + 1];
     phi1[N + 3, :, n + 1] = 3 * phi1[N + 2, :, n + 1] - 3 * phi1[N + 1, :, n + 1] + phi1[N, :, n + 1];
-    phi1[:, N + 3, n + 1] = 3 * phi1[:, N + 2, n + 1] - 3 * phi1[:, N + 1, n + 1] + phi1[:, N, n + 1];
+
     phi_first_order[N + 3, :, n + 1] = 3 * phi_first_order[N + 2, :, n + 1] - 3 * phi_first_order[N + 1, :, n + 1] + phi_first_order[N, :, n + 1];
     phi_first_order[:, N + 3, n + 1] = 3 * phi_first_order[:, N + 2, n + 1] - 3 * phi_first_order[:, N + 1, n + 1] + phi_first_order[:, N, n + 1];
 end

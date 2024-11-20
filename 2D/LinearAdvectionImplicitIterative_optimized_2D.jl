@@ -13,12 +13,12 @@ include("../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 1;
 
 K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 1;
+C = 5;
 
 # Grid settings
 xL = -1
@@ -34,7 +34,8 @@ v(x, y) = 1.0
 
 # Initial condition
 phi_0(x, y) = x.^2 + y.^2
-phi_0(x, y) = piecewiseLinear2D(x, y);
+# phi_0(x, y) = piecewiseLinear2D(x, y);
+# phi_0(x, y) = exp.(-10 * (x.^2 + y.^2));
 
 # Exact solution
 phi_exact(x, y, t) = phi_0.(x - u(x,y) .* t, y - v(x,y) .* t);          
@@ -54,7 +55,7 @@ Ntau = 1 * 2^level
 tau = C * h / maximum(max(u.(x, y), v.(x, y)))
 Ntau = Int(round(Tfinal / tau))
 
-Ntau = 1
+# Ntau = 1
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
@@ -141,7 +142,7 @@ for n = 2:Ntau + 1
     end
     for i = 3:1:N + 2      
         phi_j_predictor = ( phi[i, 3, n] - 1/2 * ( -phi1[i, 3, n] + phi[i, 3, n - 1] ) + c[i, 3] * ( phi2[i - 1, 3, n + 1] - 1/2 * ( -phi1[i - 1, 3, n + 1] + phi[i - 2, 3, n + 1] ) ) 
-        + d[i, 3] * ( phi2[i, 2, n + 1] - 1/2 * ( -phi1[i , 2, n + 1] + phi[i, 1, n + 1] ) ) ) / ( 1 + c[i, 3] + d[i, 3] );   
+                                                                                       + d[i, 3] * ( phi2[i, 2, n + 1] - 1/2 * ( -phi1[i, 2, n + 1] + phi[i, 1, n + 1] ) ) ) / ( 1 + c[i, 3] + d[i, 3] );   
     for j = 3:1:N + 2
 
         # First order solution
@@ -183,10 +184,8 @@ for n = 2:Ntau + 1
 
         phi_j_predictor = ( phi[i, j + 1, n] 
             - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi[i, j + 1, n] - phi1[i, j + 1, n] + phi[i, j + 1, n - 1] )
-            + c[i, j + 1] * ( phi2[i - 1, j + 1, n + 1]
-            - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i - 1, j + 1, n + 1] - phi1[i - 1, j + 1, n + 1] + phi[i - 2, j + 1, n + 1] ) 
-            + d[i, j + 1] * ( phi2[i, j, n + 1]
-            - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i, j - 1, n + 1] ) ) ) ) / (1 + c[i, j + 1] + d[i, j + 1]);
+            + c[i, j + 1] * ( phi2[i - 1, j + 1, n + 1] - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i - 1, j + 1, n + 1] - phi1[i - 1, j + 1, n + 1] + phi[i - 2, j + 1, n + 1] ) )
+            + d[i, j + 1] * ( phi2[i, j, n + 1]  - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i, j - 1, n + 1] ) ) ) / (1 + c[i, j + 1] + d[i, j + 1]);
             
         # Compute second order predictor for n + 2
         phi1[i - 1, j, n + 2] = ( phi[i - 1, j, n + 1] + c[i - 1, j] * phi2[i - 2, j, n + 2] + d[i - 1, j] * phi2[i - 1, j - 1, n + 2] ) / ( 1 + c[i - 1, j] + d[i - 1, j] );
@@ -212,9 +211,9 @@ for n = 2:Ntau + 1
             rd_j = phi_j_predictor - phi2[i, j, n + 1] - phi2_j_old_p + phi[i, j - 1, n + 1];
             ru_j = phi2[i, j, n + 1] - phi[i, j - 1, n + 1] - phi2[i, j - 1, n + 1] + phi[i, j - 2, n + 1];
 
-            ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
-            ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 1, 0)# * ifelse( ru_j * rd_j > 0, 1, 0)
-            α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
+            ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 1, 1)# * ifelse( ru_i * rd_i > 0, 1, 0)
+            ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 1, 1)# * ifelse( ru_j * rd_j > 0, 1, 0)
+            α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 0, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
 
             ω2_i[i, j] = ( 1 - ω1_i[i, j] )# * ifelse( ru_i * rd_i > 0, 1, 0);
             ω2_j[i, j] = ( 1 - ω1_j[i, j] )# * ifelse( ru_j * rd_j > 0, 1, 0);
@@ -227,7 +226,7 @@ for n = 2:Ntau + 1
 
             phi2_i_old = phi2[i, j, n + 1];
             phi2_j_old_p = phi2[i, j, n + 1];
-            phi2_i_old_p = phi2[i, j, n + 1];
+            # phi2_i_old_p = phi2[i, j, n + 1];
             phi2[i, j, n + 1] = phi[i, j, n + 1];
         end
     end
@@ -254,14 +253,14 @@ println("Error t*h first order: ", Error_t_h_1)
 # Error_t_h = h * sum(abs(phi[i, end-1] - phi_exact.(x[i], t[end-1])) for i in 2:Nx+2)
 # println("Error h: ", Error_t_h)
 
-# # Load the last error
-# last_error = load_last_error()
-# if last_error != nothing
-#     println("Order: ", log(2, last_error / Error_t_h))
-# end 
-# # Save the last error
-# save_last_error(Error_t_h)
-# println("=============================")
+# Load the last error
+last_error = load_last_error()
+if last_error != nothing
+    println("Order: ", log(2, last_error / Error_t_h))
+end 
+# Save the last error
+save_last_error(Error_t_h)
+println("=============================")
 
 # CSV.write("phi.csv", DataFrame(phi2, :auto))
 

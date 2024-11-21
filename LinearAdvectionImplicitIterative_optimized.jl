@@ -33,10 +33,10 @@ u(x) = 1
 
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
-# phi_0(x) = cos.(x);
+phi_0(x) = cos.(x);
 # phi_0(x) = 0. + (x - 4.)^2
 # phi_0(x) = exp.(-10*(x+0)^2);
-phi_0(x) = piecewiseLinear(x);
+# phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
@@ -165,33 +165,32 @@ for n = 2:Ntau + 1
         
             for k = 1:K # Multiple correction iterations
 
-                # SECOND ITERATION
-                rd_n = phi2[i, n + 2] - phi2[i, n + 1] - phi2_i_old + phi[i, n];
-                ru_n = phi2[i, n + 1] - phi[i, n] - phi2[i, n] + phi[i, n - 1] 
+            # SECOND ITERATION
+            rd_n = phi2[i, n + 2] - phi2[i, n + 1] - phi2_i_old + phi[i, n];
+            ru_n = phi2[i, n + 1] - phi[i, n] - phi2[i, n] + phi[i, n - 1] 
 
-                rd_i = phi_i_predictor - phi2[i, n + 1] - phi2_i_old_p + phi[i - 1, n + 1];
-                ru_i = phi2[i, n + 1] - phi[i - 1, n + 1] - phi2[i - 1, n + 1] + phi[i - 2, n + 1];
+            rd_i = phi_i_predictor - phi2[i, n + 1] - phi2_i_old_p + phi[i - 1, n + 1];
+            ru_i = phi2[i, n + 1] - phi[i - 1, n + 1] - phi2[i - 1, n + 1] + phi[i - 2, n + 1];
 
-                ω1[i] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
-                α1[i] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
+            ω1[i] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
+            α1[i] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
 
-                ω2[i] = ( 1 - ω1[i] )# * ifelse( ru_i * rd_i > 0, 1, 0);
-                α2[i] = ( 1 - α1[i] )# * ifelse( ru_n * rd_n > 0, 1, 0);     
+            ω2[i] = ( 1 - ω1[i] )# * ifelse( ru_i * rd_i > 0, 1, 0);
+            α2[i] = ( 1 - α1[i] )# * ifelse( ru_n * rd_n > 0, 1, 0);     
 
-                phi[i, n + 1] =  ( phi[i, n] 
-                    - α1[i] / 2 * ru_n - α2[i] / 2 * rd_n
-                    + c[i] * ( phi[i - 1, n + 1] - ω1[i] / 2 *  ru_i - ω2[i] / 2 * rd_i ) ) / (1 + c[i]);
+            phi[i, n + 1] =  ( phi[i, n] 
+                - α1[i] / 2 * ru_n - α2[i] / 2 * rd_n
+                + c[i] * ( phi[i - 1, n + 1] - ω1[i] / 2 *  ru_i - ω2[i] / 2 * rd_i ) ) / (1 + c[i]);
 
-                phi2_i_old = phi2[i, n + 1];
-                phi2_i_old_p = phi2[i, n + 1];
-                phi2[i, n + 1] = phi[i, n + 1];
-            end
-
-        phi[Nx + 3, n + 1] = 3*phi[Nx + 2, n + 1] - 3*phi[Nx + 1, n + 1] + phi[Nx, n + 1];
-        phi1[Nx + 3, n + 1] = 3*phi1[Nx + 2, n + 1] - 3*phi1[Nx + 1, n + 1] + phi1[Nx, n + 1];
-        phi_first_order[Nx + 3, n + 1] = 3*phi_first_order[Nx + 2, n + 1] - 3*phi_first_order[Nx + 1, n + 1] + phi_first_order[Nx, n + 1];
-        phi2[Nx + 3, n + 1] = 3*phi2[Nx + 2, n + 1] - 3*phi2[Nx + 1, n + 1] + phi2[Nx, n + 1];
+            phi2_i_old = phi2[i, n + 1];
+            phi2_i_old_p = phi2[i, n + 1];
+            phi2[i, n + 1] = phi[i, n + 1];
+        end
     end
+    phi[Nx + 3, n + 1] = 3*phi[Nx + 2, n + 1] - 3*phi[Nx + 1, n + 1] + phi[Nx, n + 1];
+    phi1[Nx + 3, n + 1] = 3*phi1[Nx + 2, n + 1] - 3*phi1[Nx + 1, n + 1] + phi1[Nx, n + 1];
+    phi_first_order[Nx + 3, n + 1] = 3*phi_first_order[Nx + 2, n + 1] - 3*phi_first_order[Nx + 1, n + 1] + phi_first_order[Nx, n + 1];
+    phi2[Nx + 3, n + 1] = 3*phi2[Nx + 2, n + 1] - 3*phi2[Nx + 1, n + 1] + phi2[Nx, n + 1];
 end
 
 end

@@ -13,7 +13,7 @@ include("../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 1;
 
 K = 7 # Number of iterations for the second order correction
 
@@ -136,8 +136,8 @@ end
 
 # Time Loop
 for n = 2:Ntau + 1
-    phi_i_predictor[1] = phi_exact.(x[4], y[1], t[n + 1]);
-    phi_i_predictor[2] = phi_exact.(x[4], y[2], t[n + 1]);
+    phi_i_predictor[1] = phi2[4, 1, n + 1];
+    phi_i_predictor[2] = phi2[4, 2, n + 1];
     for j = 3:1:N + 2
         phi_i_predictor[j] = ( phi[3, j, n] - 1/2 * ( -phi1[3, j, n] + phi[3, j, n - 1] ) + c[3, j] * ( phi2[2, j, n + 1] - 1/2 * ( -phi1[2, j, n + 1] + phi[1, j, n + 1] ) ) 
         + d[3, j] * ( phi2[3, j - 1, n + 1] - 1/2 * ( -phi1[3, j - 1, n + 1] + phi2[3, j - 2, n + 1] ) )) / ( 1 + c[3, j] + d[3, j]);
@@ -290,7 +290,7 @@ trace1 = contour(x = x, y = y, z = phi_first_order[:, :, end - 1], mode = "lines
 layout = Layout(plot_bgcolor="white", 
                 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 # plot_phi = plot([ trace2, trace1,trace5, trace4, trace3], layout)
-plot_phi = plot([ trace3, trace2], layout)
+plot_phi = plot([ trace3, trace2, trace1 ], layout)
 
 plot_phi
 

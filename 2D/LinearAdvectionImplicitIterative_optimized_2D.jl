@@ -13,12 +13,12 @@ include("../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 0;
 
-K = 7 # Number of iterations for the second order correction
+K = 9 # Number of iterations for the second order correction
 
 # Courant number
-C = 5;
+C = 0.1;
 
 # Grid settings
 xL = -1
@@ -294,10 +294,14 @@ plot_phi = plot([ trace3, trace2, trace1 ], layout)
 
 plot_phi
 
-# Plot derivative
-trace1_d_x = surface(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+# For plot purposes replace values that are delta far way from 1 and -1 by 0
+d_phi_x = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_x)
+d_phi_y = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_y)
 
-trace1_d_y = surface(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2)
+# Plot derivative
+trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+
+trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
 
 plot_phi_d_x = plot([trace1_d_x])
 plot_phi_d_y = plot([trace1_d_y])

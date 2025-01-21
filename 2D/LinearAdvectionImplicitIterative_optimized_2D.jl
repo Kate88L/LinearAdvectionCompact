@@ -50,7 +50,7 @@ X = repeat(x, 1, length(y))
 Y = repeat(y, 1, length(x))'
 
 # Time
-Tfinal = 1 * π / sqrt(7) * 2 / 20
+Tfinal = 1 * π / sqrt(7) * 1 / 5
 Ntau = 1 * 2^level
 tau = C * h / maximum(max(u.(x, y), v.(x, y)))
 Ntau = Int(round(Tfinal / tau))
@@ -132,26 +132,23 @@ for j = 3:1:N + 2
 end
 end
 
+phi_i_predictor[:] = phi2[3, :, 3];
+
 # Time Loop
 for n = 2:Ntau + 1
-    phi_i_predictor[1] = phi2[4, 1, n + 1];
-    phi_i_predictor[2] = phi2[4, 2, n + 1];
-    for j = 3:1:N + 2
-        phi_i_predictor[j] = ( phi[3, j, n] - 1/2 * ( -phi1[3, j, n] + phi[3, j, n - 1] ) + c[3, j] * ( phi2[2, j, n + 1] - 1/2 * ( -phi1[2, j, n + 1] + phi[1, j, n + 1] ) ) 
-        + d[3, j] * ( phi2[3, j - 1, n + 1] - 1/2 * ( -phi1[3, j - 1, n + 1] + phi2[3, j - 2, n + 1] ) )) / ( 1 + c[3, j] + d[3, j]);
-    end
+    phi_i_predictor[3:end] = phi2[3, 3:end, n + 1];
     for i = 3:1:N + 2      
-        phi_j_predictor = ( phi[i, 3, n] - 1/2 * ( -phi1[i, 3, n] + phi[i, 3, n - 1] ) + c[i, 3] * ( phi2[i - 1, 3, n + 1] - 1/2 * ( -phi1[i - 1, 3, n + 1] + phi[i - 2, 3, n + 1] ) ) 
-                                                                                       + d[i, 3] * ( phi2[i, 2, n + 1] - 1/2 * ( -phi1[i, 2, n + 1] + phi[i, 1, n + 1] ) ) ) / ( 1 + c[i, 3] + d[i, 3] );   
+        phi_i_predictor[1:2] = phi2[i + 1, 1:2, n + 1];   
+        global phi_j_predictor = phi2[i, 3, n + 1]; 
         for j = 3:1:N + 2
 
             # First order solution
             phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c[i, j] * phi_first_order[i - 1, j, n + 1] 
                                                                     + d[i, j] * phi_first_order[i, j - 1, n + 1] ) / ( 1 + c[i, j] + d[i, j] );
 
-            phi2_i_old = phi2[i, j, n + 1];
+            phi2_old = phi2[i, j, n + 1];
             phi2_i_old_p = phi_i_predictor[j];
-            phi2_j_old_p = phi_j_predictor;
+            global phi2_j_old_p = phi_j_predictor;
 
             # FIRST ITERATION 
             phi1[i, j, n] = ( phi[i, j, n - 1] + c[i, j] * phi[i - 1, j, n] + d[i, j] * phi[i, j - 1, n] ) / ( 1 + c[i, j] + d[i, j] );
@@ -182,7 +179,7 @@ for n = 2:Ntau + 1
                 + d[i + 1, j] * ( phi_i_predictor[j - 1]
                 - 1 / 2 * ( phi1[i + 1, j, n + 1] - phi_i_predictor[j - 1] - phi1[i + 1, j - 1, n + 1] + phi_i_predictor[j - 2] ) ) ) / (1 + c[i + 1, j] + d[i + 1, j]);
 
-            phi_j_predictor = ( phi[i, j + 1, n] 
+            global phi_j_predictor = ( phi[i, j + 1, n] 
                 - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi[i, j + 1, n] - phi1[i, j + 1, n] + phi[i, j + 1, n - 1] )
                 + c[i, j + 1] * ( phi2[i - 1, j + 1, n + 1] - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i - 1, j + 1, n + 1] - phi1[i - 1, j + 1, n + 1] + phi[i - 2, j + 1, n + 1] ) )
                 + d[i, j + 1] * ( phi2[i, j, n + 1]  - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i, j - 1, n + 1] ) ) ) / (1 + c[i, j + 1] + d[i, j + 1]);
@@ -202,7 +199,7 @@ for n = 2:Ntau + 1
             for k = 1:K # Multiple correction iterations
 
                 # SECOND ITERATION
-                rd_n = phi2[i, j, n + 2] - phi2[i, j, n + 1] - phi2_i_old + phi[i, j, n];
+                rd_n = phi2[i, j, n + 2] - phi2[i, j, n + 1] - phi2_old + phi[i, j, n];
                 ru_n = phi2[i, j, n + 1] - phi[i, j, n] - phi2[i, j, n] + phi[i, j, n - 1] 
 
                 rd_i = phi_i_predictor[j] - phi2[i, j, n + 1] - phi2_i_old_p + phi[i - 1, j, n + 1];
@@ -224,7 +221,7 @@ for n = 2:Ntau + 1
                     + c[i, j] * ( phi[i - 1, j, n + 1] - ω1_i[i, j] / 2 *  ru_i - ω2_i[i, j] / 2 * rd_i ) 
                     + d[i, j] * ( phi[i, j - 1, n + 1] - ω1_j[i, j] / 2 *  ru_j - ω2_j[i, j] / 2 * rd_j ) ) / (1 + c[i, j] + d[i, j]);
 
-                phi2_i_old = phi2[i, j, n + 1];
+                phi2_old = phi2[i, j, n + 1];
                 phi2_j_old_p = phi2[i, j, n + 1];
                 phi2_i_old_p = phi2[i, j, n + 1];
                 phi2[i, j, n + 1] = phi[i, j, n + 1];
@@ -283,7 +280,7 @@ println("maximum derivative y: ", maximum(d_phi_y))
 # Plot of the result at the final time together with the exact solution
 trace3 = contour(x = x, y = y, z = phi_exact.(X, Y, t[end-1]), mode = "lines", name = "Exact", showscale=false, contours_coloring="lines", colorscale="Greys", line_width=2)
 trace0 = contour(x = x, y = y, z = phi_0.(X, Y), mode = "lines", name = "Initial Condition", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1 )
-trace2 = contour(x = x, y = y, z = phi1[:, :, end - 1], mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
+trace2 = contour(x = x, y = y, z = phi[:, :, end - 1], mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
 trace1 = contour(x = x, y = y, z = phi_first_order[:, :, end - 1], mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_dash="dash", line_width=1)
 
 layout = Layout(plot_bgcolor="white", 

@@ -13,9 +13,9 @@ include("../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 2;
 
-K = 8 # Number of iterations for the second order correction
+K = 1 # Number of iterations for the second order correction
 
 # Courant number
 C = 0.5;
@@ -34,8 +34,8 @@ v(x, y) = 1.0
 
 # Initial condition
 # phi_0(x, y) = x.^2 + y.^2
-phi_0(x, y) = piecewiseLinear2D(x, y);
-# phi_0(x, y) = exp.(-10 * (x.^2 + y.^2));
+# phi_0(x, y) = piecewiseLinear2D(x, y);
+phi_0(x, y) = exp.(-10 * (x.^2 + y.^2));
 
 # Exact solution
 phi_exact(x, y, t) = phi_0.(x - u(x,y) .* t, y - v(x,y) .* t);          
@@ -54,8 +54,6 @@ Tfinal = 1 * π / sqrt(7) * 2 / 20
 Ntau = 1 * 2^level
 tau = C * h / maximum(max(u.(x, y), v.(x, y)))
 Ntau = Int(round(Tfinal / tau))
-
-Ntau = 1
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
@@ -231,24 +229,6 @@ for n = 2:Ntau + 1
                 phi2_i_old_p = phi2[i, j, n + 1];
                 phi2[i, j, n + 1] = phi[i, j, n + 1];
 
-                phi_i_predictor[j] = ( phi[i + 1, j, n] 
-                - 1 / 2 * ( phi_i_predictor[j] - phi[i + 1, j, n] - phi1[i + 1, j, n] + phi[i + 1, j, n - 1] ) 
-                + c[i + 1, j] * ( phi2[i, j, n + 1] 
-                - 1 / 2 * ( phi_i_predictor[j] - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i - 1, j, n + 1]) ) 
-                + d[i + 1, j] * ( phi_i_predictor[j - 1]
-                - 1 / 2 * ( phi_i_predictor[j] - phi_i_predictor[j - 1] - phi1[i + 1, j - 1, n + 1] + phi_i_predictor[j - 2] ) ) ) / (1 + c[i + 1, j] + d[i + 1, j]);
-
-                phi_j_predictor =  ( phi[i, j + 1, n] 
-                - 1 / 2 * ( phi_j_predictor - phi[i, j + 1, n] - phi1[i, j + 1, n] + phi[i, j + 1, n - 1] )
-                + c[i, j + 1] * ( phi2[i - 1, j + 1, n + 1] - 1 / 2 * ( phi_j_predictor - phi2[i - 1, j + 1, n + 1] - phi1[i - 1, j + 1, n + 1] + phi[i - 2, j + 1, n + 1] ) )
-                + d[i, j + 1] * ( phi2[i, j, n + 1]  - 1 / 2 * ( phi_j_predictor - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i, j - 1, n + 1] ) ) ) / (1 + c[i, j + 1] + d[i, j + 1]);
-
-                # phi2[i, j, n + 2] = ( phi2[i, j, n + 1] 
-                # - 1 / 2 * ( phi1[i, j, n + 2] - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i, j, n] ) 
-                # + c[i, j] * ( phi2[i - 1, j, n + 2] 
-                # - 1 / 2 * ( phi1[i, j, n + 2] - phi2[i - 1, j, n + 2] - phi1[i - 1, j, n + 2] + phi2[i - 2, j, n + 2]) )
-                # + d[i, j] * ( phi2[i, j - 1, n + 2]
-                # - 1 / 2 * ( phi1[i, j, n + 2] - phi2[i, j - 1, n + 2] - phi1[i, j - 1, n + 2] + phi2[i, j - 2, n + 2]) ) ) / (1 + c[i, j] + d[i, j]);
             end
             phi[N + 3, j, n + 1] = 3 * phi[N + 2, j, n + 1] - 3 * phi[N + 1, j, n + 1] + phi[N, j, n + 1];
             phi2[N + 3, j, n + 1] = 3 * phi2[N + 2, j, n + 1] - 3 * phi2[N + 1, j, n + 1] + phi2[N, j, n + 1];

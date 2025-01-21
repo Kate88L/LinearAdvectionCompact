@@ -252,7 +252,7 @@ println("Error t*h first order: ", Error_t_h_1)
 
 # Load the last error
 last_error = load_last_error()
-if last_error != nothing
+if last_error !== nothing
     println("Order: ", log(2, last_error / Error_t_h))
 end 
 # Save the last error

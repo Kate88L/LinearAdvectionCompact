@@ -44,6 +44,23 @@ function nonSmoothRotation(x, y, t)
     return min.(result, 0.15)
 end
 
+function rotatedGaussian(x, y, t)
+    # Apply the 2D rotation matrix to the input coordinates
+    x_rot = x .* cos(t) + y .* sin(t)
+    y_rot = -x .* sin(t) + y .* cos(t)
+
+    x_rot = 4 * x_rot
+    y_rot = 4 * y_rot
+
+    x_shifted = x_rot - 1  # Shift to the right (first quadrant)
+    y_shifted = y_rot - 1  # Shift upwards (first quadrant)
+    
+    # Evaluate the Gaussian function at the rotated coordinates
+    result = exp.(-10 * (x_shifted.^2 + y_shifted.^2))
+    
+    return result
+end
+
 function exactLozanoAslam(x, t)
     if ( t < 0.5 )
         if 0.3 - 0.0 * t <= x <= 0.3 + t

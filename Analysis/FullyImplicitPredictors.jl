@@ -40,14 +40,18 @@ u_imm_nm = u_i_n -  Sym(2)* h * DX - tau * DT +
                 ( Sym(8) * h^Sym(3) /  Sym(6)) * DXXX - (tau^Sym(3) /  Sym(6)) * DTTT - ( Sym(4) * h^Sym(2) * tau / Sym(2)) * DXXT - ( Sym(2)* h * tau^Sym(2) / Sym(2)) * DXTT
 
 
-u_immm_n = u_i_n - Sym(3) * h * DX +  Sym(6) * (h^Sym(2) / Sym(2)) * DXX -  Sym(9) * (h^Sym(3) /  Sym(6)) * DXXX
+u_immm_n = u_i_n - Sym(3) * h * DX +  Sym(9) * (h^Sym(2) / Sym(2)) * DXX -  Sym(27) * (h^Sym(3) /  Sym(6)) * DXXX
+
+u_imm_np = u_i_n -  Sym(2)* h * DX + tau * DT +
+                ( Sym(4) * h^Sym(2) / Sym(2)) * DXX + (tau^Sym(2) / Sym(2)) * DTT -  Sym(2)* tau * h * DXT - 
+                ( Sym(8) * h^Sym(3) /  Sym(6)) * DXXX + (tau^Sym(3) /  Sym(6)) * DTTT + ( Sym(4) * h^Sym(2) * tau / Sym(2)) * DXXT - ( Sym(2)* h * tau^Sym(2) / Sym(2)) * DXTT
 
 u_immm_np = u_i_n -  Sym(3)* h * DX + tau * DT +
-                ( Sym(6) * h^Sym(2) / Sym(2)) * DXX + (tau^Sym(2) / Sym(2)) * DTT -  Sym(3)* tau * h * DXT - 
-                ( Sym(9) * h^Sym(3) /  Sym(6)) * DXXX + (tau^Sym(3) /  Sym(6)) * DTTT + ( Sym(6) * h^Sym(2) * tau / Sym(2)) * DXXT - ( Sym(3)* h * tau^Sym(2) / Sym(2)) * DXTT
+                ( Sym(9) * h^Sym(2) / Sym(2)) * DXX + (tau^Sym(2) / Sym(2)) * DTT -  Sym(3)* tau * h * DXT - 
+                ( Sym(27) * h^Sym(3) /  Sym(6)) * DXXX + (tau^Sym(3) /  Sym(6)) * DTTT + ( Sym(9) * h^Sym(2) * tau / Sym(2)) * DXXT - ( Sym(3)* h * tau^Sym(2) / Sym(2)) * DXTT
 u_immmm_np = u_i_n -  Sym(4)* h * DX + tau * DT +
-                ( Sym(8) * h^Sym(2) / Sym(2)) * DXX + (tau^Sym(2) / Sym(2)) * DTT -  Sym(4)* tau * h * DXT - 
-                ( Sym(16) * h^Sym(3) /  Sym(6)) * DXXX + (tau^Sym(3) /  Sym(6)) * DTTT + ( Sym(8) * h^Sym(2) * tau / Sym(2)) * DXXT - ( Sym(4)* h * tau^Sym(2) / Sym(2)) * DXTT
+                ( Sym(16) * h^Sym(2) / Sym(2)) * DXX + (tau^Sym(2) / Sym(2)) * DTT -  Sym(4)* tau * h * DXT - 
+                ( Sym(64) * h^Sym(3) /  Sym(6)) * DXXX + (tau^Sym(3) /  Sym(6)) * DTTT + ( Sym(16) * h^Sym(2) * tau / Sym(2)) * DXXT - ( Sym(4)* h * tau^Sym(2) / Sym(2)) * DXTT
 
 # First order Predictors
 dc = 0
@@ -95,12 +99,7 @@ uP_i_np = ( uP2_i_n + c * uP2_im_np ) / (  Sym(1) + c ) # predictor for u_i_n+2
 uP2_i_np = ( uP2_i_n -  Sym(1) / Sym(2) * ( uP_i_np - uP_i_n - uP2_i_n + u_i_nm ) 
                 + c * ( uP2_im_np -  Sym(1) / Sym(2) * ( uP_i_np - uP_im_np - uP2_im_np + uP2_imm_np ) ) ) / (  Sym(1) + c )
 
-# Upwind scheme
-# S = ( u_i_n - u_i_nm + α/ Sym(2)*  ( uP_i_np -  Sym(2)* uP_i_n + uP_i_nm ) + ( Sym(1) - α)/ Sym(2)* ( u_i_n -  Sym(2)* u_i_nm + u_i_nmm ) 
-#                 + c * ( u_i_n - u_im_n + ω/ Sym(2)* ( uP_ip_n -  Sym(2)* uP_i_n + uP_im_n ) + ( Sym(1) - ω)/ Sym(2)* ( u_i_n -  Sym(2)* u_im_n + u_imm_n ) ) )
-# S = ( u_i_n - u_i_nm +  Sym(1)/ Sym(2)* ( uP_i_n - uP_i_nm - u_i_nm + u_i_nmm ) 
-#                 + c * ( u_i_n - u_im_n +  Sym(1)/ Sym(2)* ( uP_i_n - uP_im_n - u_im_n + u_imm_n ) ) )
-
+# Final scheme
 S = ( u_i_n - u_i_nm + α / Sym(2) * ( uP2_i_n - uP2_i_nm - u_i_nm + u_i_nmm ) + ( Sym(1) - α ) /  Sym(2) * ( uP2_i_np - uP2_i_n - uP2_i_n + u_i_nm )
                  + c * ( u_i_n - u_im_n + ω / Sym(2) * ( uP2_i_n - uP2_im_n - u_im_n + u_imm_n ) + ( Sym(1) - ω ) /  Sym(2) * ( uP2_ip_n - uP2_i_n - uP2_i_n + u_im_n ) ) ) 
 

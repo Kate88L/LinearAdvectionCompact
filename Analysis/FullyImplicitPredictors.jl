@@ -8,7 +8,7 @@ using SymPy
 
 @syms c cm cmm cp dc
 
-@syms v # velocity
+@syms v dv # velocity
 
 # Taylor expansion
 u_imm_n = u_i_n -  Sym(2)* h * DX +  Sym(4) * (h^Sym(2) / Sym(2)) * DXX -  Sym(8) * (h^Sym(3) /  Sym(6)) * DXXX
@@ -40,7 +40,7 @@ u_imm_nm = u_i_n -  Sym(2)* h * DX - tau * DT +
                 ( Sym(8) * h^Sym(3) /  Sym(6)) * DXXX - (tau^Sym(3) /  Sym(6)) * DTTT - ( Sym(4) * h^Sym(2) * tau / Sym(2)) * DXXT - ( Sym(2)* h * tau^Sym(2) / Sym(2)) * DXTT
 
 
-u_immm_n = u_i_n - Sym(3) * h * DX +  Sym(9) * (h^Sym(2) / Sym(2)) * DXX -  Sym(27) * (h^Sym(3) /  Sym(6)) * DXXX
+u_immm_n = u_i_n - Sym(3) * h * DX +  Sym(9) * (h^Sym(2) / Sym(2)) * DXX - Sym(27) * (h^Sym(3) /  Sym(6)) * DXXX
 
 u_imm_np = u_i_n -  Sym(2)* h * DX + tau * DT +
                 ( Sym(4) * h^Sym(2) / Sym(2)) * DXX + (tau^Sym(2) / Sym(2)) * DTT -  Sym(2)* tau * h * DXT - 
@@ -103,13 +103,23 @@ uP2_i_np = ( uP2_i_n -  Sym(1) / Sym(2) * ( uP_i_np - uP_i_n - uP2_i_n + u_i_nm 
 S = ( u_i_n - u_i_nm + α / Sym(2) * ( uP2_i_n - uP2_i_nm - u_i_nm + u_i_nmm ) + ( Sym(1) - α ) /  Sym(2) * ( uP2_i_np - uP2_i_n - uP2_i_n + u_i_nm )
                  + c * ( u_i_n - u_im_n + ω / Sym(2) * ( uP2_i_n - uP2_im_n - u_im_n + u_imm_n ) + ( Sym(1) - ω ) /  Sym(2) * ( uP2_ip_n - uP2_i_n - uP2_i_n + u_im_n ) ) ) 
 
+S = ( u_i_n - u_i_nm + α / Sym(2) * ( uP_i_n - uP_i_nm - u_i_nm + u_i_nmm ) 
+                + c * ( u_i_n - u_im_n + ω / Sym(2) * ( uP_i_n - uP_im_n - u_im_n + u_imm_n )) )
 
 S = S.subs(c, v * tau / h)
 S = S.subs(DT, - v * DX)
 S = S.subs(DTT, - v * DXT)
-S = S.subs(DXT, - v * DXX)
-S = S.subs(α,  Sym(0))
-S = S.subs(ω, Sym(0))
+# S = S.subs(DXT, - v * DXX - dv * DX)
+# S = S.subs(dv, (h * c / tau - h * cm / tau) / h)
+
+# S = S - tau / (2*(h + tau*v)) * 1*DX*dv*h*tau*v
+
+# S = S.subs(DTTT, - v^3 * DXXX)
+# S = S.subs(DXTT, - v^2 * DXXX)
+# S = S.subs(DXXT, - v * DXXX)
+
+S = S.subs(α, Sym(1))
+S = S.subs(ω, Sym(1))
 
 
 print("\n")

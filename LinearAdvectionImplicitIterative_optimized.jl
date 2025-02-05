@@ -123,7 +123,7 @@ for n = 2:Ntau + 1
 
     phi1[3, n] = ( phi[3, n - 1] + c[3] * phi[2, n] ) / ( 1 + c[3] );
 
-    phi_i_predictor = ( phi[3, n] - 1/2 * ( -phi1[3, n] + phi[3 , n - 1] ) + c[3] * ( phi2[2, n + 1] - 1/2 * ( -phi1[2, n + 1] + phi[1, n + 1] ) ) ) / ( 1 + c[3] );
+    global phi_i_predictor = ( phi[3, n] - 1/2 * ( -phi1[3, n] + phi[3 , n - 1] ) + c[3] * ( phi2[2, n + 1] - 1/2 * ( -phi1[2, n + 1] + phi[1, n + 1] ) ) ) / ( 1 + c[3] );
 
     for i = 3:1:Nx + 2
 
@@ -131,7 +131,7 @@ for n = 2:Ntau + 1
         phi_first_order[i, n + 1] = ( phi_first_order[i, n] + c[i] * phi_first_order[i - 1, n + 1] ) / ( 1 + c[i] );
 
         phi2_i_old = phi2[i, n + 1];
-        phi2_i_old_p = phi_i_predictor;
+        global phi2_i_old_p = phi_i_predictor;
 
         # FIRST ITERATION 
         phi1[i, n] = ( phi[i, n - 1] + c[i] * phi[i - 1, n] ) / ( 1 + c[i] );
@@ -149,7 +149,7 @@ for n = 2:Ntau + 1
         phi1[i + 1, n] = ( phi[i + 1, n - 1] + c[i + 1] * phi[i, n] ) / ( 1 + c[i + 1] );
         phi1[i + 1, n + 1] = ( phi[i + 1, n] + c[i + 1] * phi[i, n + 1] ) / ( 1 + c[i + 1] );
 
-        phi_i_predictor = ( phi[i + 1, n] 
+        global phi_i_predictor = ( phi[i + 1, n] 
             - 1 / 2 * ( phi1[i + 1, n + 1] - phi[i + 1, n] - phi1[i + 1, n] + phi[i + 1, n - 1] ) 
             + c[i + 1] * ( phi2[i, n + 1] 
             - 1 / 2 * ( phi1[i + 1, n + 1] - phi2[i, n + 1] - phi1[i, n + 1] + phi[i - 1, n + 1]) ) ) / (1 + c[i + 1]);

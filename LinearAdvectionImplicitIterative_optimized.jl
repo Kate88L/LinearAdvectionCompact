@@ -41,7 +41,7 @@ phi_0(x) = cos.(x);
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
 # phi_exact(x, t) = cosVelocitySmooth(x, t);
-phi_exact(x, t) = phi_0.(x - t);             
+phi_exact(x, t) = phi_0.(x - t * u.(x));             
 
 ## Comptutation
 

@@ -5,6 +5,7 @@ using PlotlyJS
 using CSV 
 using DataFrames
 using JSON
+using DataStructures
 
 include("../Utils/InitialFunctions.jl")
 include("../Utils/ExactSolutions.jl")
@@ -13,12 +14,12 @@ include("../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 3;
 
 K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 0.5;
+C = 2;
 
 # Grid settings
 xL = -1
@@ -81,6 +82,7 @@ phi[:, :, 2] = phi_exact.(X, Y, tau);
 phi_first_order[:, :, 2] = phi_exact.(X, Y, tau);
 
 phi_i_predictor = zeros(N + 3)
+phi_j_predictor = [CircularBuffer{Float64}(3) for _ in 1:N + 3] # buffer  of last 3 values needed to predict j+1 for each j
 
 # Boundary conditions
 for n = 2:Ntau + 3
@@ -132,23 +134,29 @@ for j = 3:1:N + 2
 end
 end
 
-phi_i_predictor[:] = phi2[3, :, 3];
+# phi_i_predictor[:] = phi2[3, :, 3];
+# phi_j_predictor[:] = phi2[:, 3, 3];
 
 # Time Loop
 for n = 2:Ntau + 1
     phi_i_predictor[3:end] = phi2[3, 3:end, n + 1];
+    for j = 2:1:N + 2
+        empty!(phi_j_predictor[j]);
+        push!(phi_j_predictor[j], 0.0);
+        push!(phi_j_predictor[j], phi2[1, j + 1, n + 1]);
+        push!(phi_j_predictor[j], phi2[2, j + 1, n + 1]);
+    end
     for i = 3:1:N + 2      
-        phi_i_predictor[1:2] = phi2[i + 1, 1:2, n + 1];   
-        global phi_j_predictor = phi2[i, 3, n + 1]; 
+        phi_i_predictor[1:2] = phi2[i + 1, 1:2, n + 1];  
+        push!(phi_j_predictor[2], phi2[i, 3, n + 1])
         for j = 3:1:N + 2
-
             # First order solution
             phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c[i, j] * phi_first_order[i - 1, j, n + 1] 
                                                                     + d[i, j] * phi_first_order[i, j - 1, n + 1] ) / ( 1 + c[i, j] + d[i, j] );
 
             phi2_old = phi2[i, j, n + 1];
             phi2_i_old_p = phi_i_predictor[j];
-            global phi2_j_old_p = phi_j_predictor;
+            phi2_j_old_p = phi_j_predictor[j-1][3];
 
             # FIRST ITERATION 
             phi1[i, j, n] = ( phi[i, j, n - 1] + c[i, j] * phi[i - 1, j, n] + d[i, j] * phi[i, j - 1, n] ) / ( 1 + c[i, j] + d[i, j] );
@@ -179,10 +187,12 @@ for n = 2:Ntau + 1
                 + d[i + 1, j] * ( phi_i_predictor[j - 1]
                 - 1 / 2 * ( phi1[i + 1, j, n + 1] - phi_i_predictor[j - 1] - phi1[i + 1, j - 1, n + 1] + phi_i_predictor[j - 2] ) ) ) / (1 + c[i + 1, j] + d[i + 1, j]);
 
-            global phi_j_predictor = ( phi[i, j + 1, n] 
+            phi_j = ( phi[i, j + 1, n] 
                 - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi[i, j + 1, n] - phi1[i, j + 1, n] + phi[i, j + 1, n - 1] )
-                + c[i, j + 1] * ( phi2[i - 1, j + 1, n + 1] - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i - 1, j + 1, n + 1] - phi1[i - 1, j + 1, n + 1] + phi[i - 2, j + 1, n + 1] ) )
+                + c[i, j + 1] * ( phi_j_predictor[j][3] - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi_j_predictor[j][3] - phi1[i - 1, j + 1, n + 1] + phi_j_predictor[j][2] ) )
                 + d[i, j + 1] * ( phi2[i, j, n + 1]  - 1 / 2 * ( phi1[i, j + 1, n + 1] - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i, j - 1, n + 1] ) ) ) / (1 + c[i, j + 1] + d[i, j + 1]);
+
+            push!(phi_j_predictor[j], phi_j);
                 
             # Compute second order predictor for n + 2
             phi1[i - 1, j, n + 2] = ( phi[i - 1, j, n + 1] + c[i - 1, j] * phi2[i - 2, j, n + 2] + d[i - 1, j] * phi2[i - 1, j - 1, n + 2] ) / ( 1 + c[i - 1, j] + d[i - 1, j] );
@@ -205,12 +215,12 @@ for n = 2:Ntau + 1
                 rd_i = phi_i_predictor[j] - phi2[i, j, n + 1] - phi2_i_old_p + phi[i - 1, j, n + 1];
                 ru_i = phi2[i, j, n + 1] - phi[i - 1, j, n + 1] - phi2[i - 1, j, n + 1] + phi[i - 2, j, n + 1];
 
-                rd_j = phi_j_predictor - phi2[i, j, n + 1] - phi2_j_old_p + phi[i, j - 1, n + 1];
+                rd_j = phi_j_predictor[j][3] - phi2[i, j, n + 1] - phi2_j_old_p + phi[i, j - 1, n + 1];
                 ru_j = phi2[i, j, n + 1] - phi[i, j - 1, n + 1] - phi2[i, j - 1, n + 1] + phi[i, j - 2, n + 1];
 
-                ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
-                ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 1, 0)# * ifelse( ru_j * rd_j > 0, 1, 0)
-                α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
+                ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 0, 0)# * ifelse( ru_i * rd_i > 0, 1, 0)
+                ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 0, 0)# * ifelse( ru_j * rd_j > 0, 1, 0)
+                α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 0, 0)# * ifelse( ru_n * rd_n > 0, 1, 0)
 
                 ω2_i[i, j] = ( 1 - ω1_i[i, j] )# * ifelse( ru_i * rd_i > 0, 1, 0);
                 ω2_j[i, j] = ( 1 - ω1_j[i, j] )# * ifelse( ru_j * rd_j > 0, 1, 0);

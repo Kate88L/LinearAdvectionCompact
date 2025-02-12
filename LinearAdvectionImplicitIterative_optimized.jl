@@ -12,12 +12,12 @@ include("Utils/Utils.jl")
 
 ## Definition of basic parameters
 
-third_order = false;
+third_order = true;
 
 # Level of refinement
 level = 2;
 
-K = 3; # Number of iterations for the second order correction
+K = 1; # Number of iterations for the second order correction
 
 # Courant number
 C = 3;
@@ -29,9 +29,9 @@ Nx = 100 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
-u(x) = 1 + 3/4 * cos(x)
+# u(x) = 1 + 3/4 * cos(x)
 # u(x) = 2 + 3/2 * cos(x)
-# u(x) = 5
+u(x) = 1
 
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
@@ -41,9 +41,9 @@ phi_0(x) = cos.(x);
 # phi_0(x) = piecewiseLinear(x);
 
 # Exact solution
-phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
+# phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
 # phi_exact(x, t) = cosVelocitySmooth(x, t);
-# phi_exact(x, t) = phi_0.(x - t * u.(x));             
+phi_exact(x, t) = phi_0.(x - t * u.(x));             
 
 ## Comptutation
 
@@ -181,8 +181,8 @@ for n = 2:Ntau + 1
             ω1[i] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0) * Int(!third_order) * ifelse( ru_i * rd_i > 0, 1, 0)
             α1[i] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0) * Int(!third_order) * ifelse( ru_n * rd_n > 0, 1, 0)
 
-            ω2[i] = ( 1 - ω1[i] ) * ifelse( ru_i * rd_i > 0, 1, 0);
-            α2[i] = ( 1 - α1[i] ) * ifelse( ru_n * rd_n > 0, 1, 0);     
+            ω2[i] = ( 1 - ω1[i] )
+            α2[i] = ( 1 - α1[i] )     
 
             phi[i, n + 1] =  ( phi[i, n] 
                 - α1[i] / 2 * ru_n - α2[i] / 2 * rd_n
@@ -260,8 +260,8 @@ for n = 2:Ntau + 1
             ω1[i] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0) * Int(!third_order) * ifelse( ru_i * rd_i > 0, 1, 0)
             α1[i] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0) * Int(!third_order) * ifelse( ru_n * rd_n > 0, 1, 0)
 
-            ω2[i] = ( 1 - ω1[i] ) * ifelse( ru_i * rd_i > 0, 1, 0);
-            α2[i] = ( 1 - α1[i] ) * ifelse( ru_n * rd_n > 0, 1, 0);     
+            ω2[i] = ( 1 - ω1[i] )
+            α2[i] = ( 1 - α1[i] )   
 
             phi[i, n + 1] =  ( phi[i, n] 
                 - α1[i] / 2 * ru_n - α2[i] / 2 * rd_n

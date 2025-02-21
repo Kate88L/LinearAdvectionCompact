@@ -99,9 +99,6 @@ phi_predictor_j = [CircularBuffer{Float64}(2) for _ in 1:N + 3] # buffer  of las
 ω0 = 0;
 α0 = 0;
 
-i_ok = 1;
-j_ok = 1;
-
 ω1_i = zeros(N + 3, N + 3) .+ ω0;
 ω2_i = zeros(N + 3, N + 3) .+ ω0;
 ω1_j = zeros(N + 3, N + 3) .+ ω0;
@@ -224,11 +221,8 @@ for n = 2:Ntau + 1
 
         for i = swI
             phi_predictor_i[swJ_m[1:2]] = ifelse(sweep < 3, phi2_old_[i + 1, swJ_m[1:2]], phi2_old_[i - 1, swJ_m[1:2]]);  
-            phi_predictor_j[swI_m[2]][2] = phi2_old_[i, swJ[1]]
+            phi_predictor_j[swJ_m[2]][2] = phi2_old_[i, swJ[1]]
             for j = swJ
-
-                global i_ok = ifelse(( c_p[i, j] > 0 && sweep < 3 ) || (  c_m[i, j] < 0 && sweep > 2 ), 1, 0);
-                global j_ok = ifelse(( d_p[i, j] > 0 && sweep % 2 == 1 ) || (  d_m[i, j] < 0 && sweep % 2 == 0 ), 1, 0);
 
                 # First order solution
                 phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c_p[i, j] * phi_first_order[i - 1, j, n + 1] 
@@ -292,7 +286,7 @@ for n = 2:Ntau + 1
                     phi_predictor_i[j] = ( phi[i - 1, j, n] - 0.5 * ( phi1[i - 1, j, n + 1] - phi[i - 1, j, n] - phi1[i - 1, j, n] + phi[i - 1, j, n - 1] ) 
                         - c_m[i - 1, j] * ( phi2[i, j, n + 1] - 0.5 * ( phi1[i - 1, j, n + 1] - phi2[i, j, n + 1] - phi1[i, j, n + 1] + phi[i + 1, j, n + 1]) ) 
                         + d_p[i - 1, j] * ( phi_predictor_i[j - 1] - 0.5 * ( phi1[i - 1, j, n + 1] - phi_predictor_i[j - 1] - phi1[i - 1, j - 1, n + 1] + phi_predictor_i[j - 2] ) ) 
-                        - d_m[i - 1, j] * ( phi_predictor_i[j + 1] - 0.5 * ( phi1[i - 1, j, n + 1] - phi_predictor_i[j + 1] - phi1[i - 1, j + 1, n + 1] + phi_predictor_i[j + 2] ) ) ) / ( 1 - c_m[i - 1, j] + d_p[i + 1, j] - d_m[i + 1, j] );
+                        - d_m[i - 1, j] * ( phi_predictor_i[j + 1] - 0.5 * ( phi1[i - 1, j, n + 1] - phi_predictor_i[j + 1] - phi1[i - 1, j + 1, n + 1] + phi_predictor_i[j + 2] ) ) ) / ( 1 - c_m[i - 1, j] + d_p[i - 1, j] - d_m[i - 1, j] );
                 end
 
                 # Compute first order predictor in y direction
@@ -370,7 +364,7 @@ for n = 2:Ntau + 1
                     ru_j = ifelse( d_p[i, j] > 0, ru_j_p, ru_j_m);
                     rd_j = ifelse( d_p[i, j] > 0, rd_j_p, rd_j_m);
 
-                    if sweep > 2 && c_p[i, j] > 0 || sweep % 2 == 0 && d_p[i, j] > 0
+                    if (sweep > 2 && c_p[i, j] > 0) || (sweep % 2 == 0 && d_p[i, j] > 0)
                         continue
                     end
 

@@ -16,7 +16,7 @@ include("../Utils/Utils.jl")
 third_order = true;
 
 # Level of refinement
-level = 0;
+level = 2;
 
 K = 1 # Number of iterations for the second order correction
 
@@ -32,7 +32,7 @@ N = 40 * 2^level
 h = (xR - xL) / N
 
 # Velocity
-u(x, y) = 1.0
+u(x, y) = 0.5
 v(x, y) = 1.0
 
 # Initial condition
@@ -230,6 +230,12 @@ for n = 2:Ntau + 1
                                                                           - c_m[i, j] * phi_first_order[i + 1, j, n + 1]
                                                                           - d_m[i, j] * phi_first_order[i, j + 1, n + 1] ) / ( 1 + c_p[i, j] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
 
+                
+                if (sweep > 2 && c_p[i, j] > 0) || (sweep % 2 == 0 && d_p[i, j] > 0) && third_order
+                    continue
+                end
+
+
                 phi2_old = phi2_old_[i, j];
                 phi2_i_old_p = phi_predictor_i[j];
                 phi2_j_old_p = ifelse(sweep % 2 == 1, phi_predictor_j[j-1][2], phi_predictor_j[j+1][2]);
@@ -342,9 +348,6 @@ for n = 2:Ntau + 1
 
                 for k = 1:K # Multiple correction iterations
 
-                    # phi2_i_old_p = phi2[i, j, n + 1];
-                    # phi2_j_old_p = phi2[i, j, n + 1];
-
                     # SECOND ITERATION
                     rd_n = phi2[i, j, n + 2] - phi2[i, j, n + 1] - phi2_old + phi[i, j, n];
                     ru_n = phi2[i, j, n + 1] - phi[i, j, n] - phi2[i, j, n] + phi[i, j, n - 1] 
@@ -363,10 +366,6 @@ for n = 2:Ntau + 1
                     rd_i = ifelse( c_p[i, j] > 0, rd_i_p, rd_i_m);
                     ru_j = ifelse( d_p[i, j] > 0, ru_j_p, ru_j_m);
                     rd_j = ifelse( d_p[i, j] > 0, rd_j_p, rd_j_m);
-
-                    if (sweep > 2 && c_p[i, j] > 0) || (sweep % 2 == 0 && d_p[i, j] > 0)
-                        continue
-                    end
 
                     ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 0, 0)# * Int(!third_order)# * ifelse( ru_i * rd_i > 0, 1, 0)
                     ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 0, 0)# * Int(!third_order)# * ifelse( ru_j * rd_j > 0, 1, 0)

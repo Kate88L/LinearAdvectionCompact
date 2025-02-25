@@ -176,10 +176,10 @@ for sweep in 1:4
                                        - d_m[i, j] * phi[i, j + 1, 2] ) / ( 1 + c_p[i, j] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
         phi1[i - 1, j, 3] = ( phi[i - 1, j, 2] + c_p[i - 1, j] * phi2[i - 2, j, 3]
                                                + d_p[i - 1, j] * phi2[i - 1, j - 1, 3]
-                                               - d_m[i - 1, j] * phi2[i - 1, j + 1, 3] ) / ( 1 + c_p[i - 1, j] + d_p[i - 1, j] - d_m[i, j] );
+                                               - d_m[i - 1, j] * phi2[i - 1, j + 1, 3] ) / ( 1 + c_p[i - 1, j] + d_p[i - 1, j] - d_m[i - 1, j] );
         phi1[i + 1, j, 3] = ( phi[i + 1, j, 2] - c_m[i + 1, j] * phi2[i + 2, j, 3]
                                                + d_p[i + 1, j] * phi2[i + 1, j - 1, 3]
-                                               - d_m[i + 1, j] * phi2[i + 1, j + 1, 3] ) / ( 1 - c_m[i + 1, j] + d_p[i + 1, j] - d_m[i, j] );
+                                               - d_m[i + 1, j] * phi2[i + 1, j + 1, 3] ) / ( 1 - c_m[i + 1, j] + d_p[i + 1, j] - d_m[i + 1, j] );
         phi1[i, j - 1, 3] = ( phi[i, j - 1, 2] + c_p[i, j - 1] * phi2[i - 1, j - 1, 3]
                                                - c_m[i, j - 1] * phi2[i + 1, j - 1, 3]
                                                + d_p[i, j - 1] * phi2[i, j - 2, 3] ) / ( 1 + c_p[i, j - 1] - c_m[i, j - 1] + d_p[i, j - 1] );
@@ -260,7 +260,7 @@ for n = 2:Ntau + 1
                 phi1[i, j, n + 1] = ( phi[i, j, n] + c_p[i, j] * phi[i - 1, j, n + 1] 
                                                    + d_p[i, j] * phi[i, j - 1, n + 1] 
                                                    - c_m[i, j] * phi[i + 1, j, n + 1]
-                                                   - d_m[i, j] * phi[i, j + 1, n + 1] ) / ( 1 + c_p[i, i] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
+                                                   - d_m[i, j] * phi[i, j + 1, n + 1] ) / ( 1 + c_p[i, j] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
 
                 phi[i, j, n + 1] = ( phi[i, j, n] - 0.5 * ( phi1[i, j, n + 1] - phi[i, j, n] - phi1[i, j, n] + phi[i, j, n - 1] ) 
                     + c_p[i, j] * ( phi[i - 1, j, n + 1] - 0.5 * ( phi1[i, j, n + 1] - phi[i - 1, j, n + 1] - phi1[i - 1, j, n + 1] + phi[i - 2, j, n + 1] ) )

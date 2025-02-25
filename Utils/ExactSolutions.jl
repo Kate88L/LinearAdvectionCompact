@@ -26,10 +26,16 @@ function phi_derivative_t(phi, x, t)
 end
 
 # Rotation of a square in 2D
-function nonSmoothRotation(x, y, t) 
+function nonSmoothRotation(x, y, t, orientation = "counterclockwise") 
 
-    x_hat = x .* cos(t) + y .* sin(t) - 1/4
-    y_hat = y .* cos(t) - x .* sin(t) - 1/4
+    if orientation == "counterclockwise"
+        x_hat = x .* cos(t) + y .* sin(t) - 1/4
+        y_hat = y .* cos(t) - x .* sin(t) - 1/4
+    else
+        x_hat = x .* cos(t) - y .* sin(t) - 1/4
+        y_hat = y .* cos(t) + x .* sin(t) - 1/4
+    end
+
 
     if y_hat >= abs.(x_hat)
         result = y_hat
@@ -44,10 +50,15 @@ function nonSmoothRotation(x, y, t)
     return min.(result, 0.15)
 end
 
-function rotatedGaussian(x, y, t)
+function rotatedGaussian(x, y, t, orientation = "counterclockwise")
     # Apply the 2D rotation matrix to the input coordinates
-    x_rot = x .* cos(t) + y .* sin(t)
-    y_rot = -x .* sin(t) + y .* cos(t)
+    if orientation == "counterclockwise"
+        x_rot = x .* cos(t) + y .* sin(t)
+        y_rot = -x .* sin(t) + y .* cos(t)
+    else
+        x_rot = x .* cos(t) - y .* sin(t)
+        y_rot = x .* sin(t) + y .* cos(t)
+    end
 
     x_rot = 4 * x_rot
     y_rot = 4 * y_rot

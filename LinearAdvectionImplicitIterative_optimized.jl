@@ -15,7 +15,7 @@ include("Utils/Utils.jl")
 third_order = true;
 
 # Level of refinement
-level = 2;
+level = 4;
 
 K = 1; # Number of iterations for the second order correction
 
@@ -25,7 +25,7 @@ C = 3;
 # Grid settings
 xL = - 1 * π / 2
 xR =  π / 2
-Nx = 100 * 2^level
+Nx = 40 * 2^level
 h = (xR - xL) / Nx
 
 # Velocity
@@ -146,8 +146,8 @@ for n = 2:Ntau + 1
 
         phi[i, n + 1] =  ( phi[i, n] 
             - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) 
-            + c[i] * ( phi[i - 1, n + 1] + (c[i] - c[i-1]) * phi[i - 1, n + 1] / (2 * (1 + c[i]))
-            - 1 / 2 * ( phi1[i, n + 1] - phi[i - 1, n + 1] - phi1[i - 1, n + 1] + phi[i - 2, n + 1]) ) ) / (1 + c[i] + c[i] * (c[i] - c[i-1]) / (2 * (1 + c[i])) );
+            + c[i] * ( phi[i - 1, n + 1] 
+            - 1 / 2 * ( phi1[i, n + 1] - phi[i - 1, n + 1] - phi1[i - 1, n + 1] + phi[i - 2, n + 1]) ) ) / (1 + c[i]);
             
         phi2[i, n + 1] = phi[i, n + 1];
 

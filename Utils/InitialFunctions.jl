@@ -22,7 +22,7 @@ end
 
 # Piecewise linear 2D function
 function piecewiseLinear2D(x, y) 
-    return max(abs(x), abs(y)) - 0.5
+    return max(-max(abs(x), abs(y)) + 2., 0.0)
 end
 
 # Non smooth function

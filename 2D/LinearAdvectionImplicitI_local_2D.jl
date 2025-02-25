@@ -367,9 +367,9 @@ for n = 2:Ntau + 1
                     ru_j = ifelse( d_p[i, j] > 0, ru_j_p, ru_j_m);
                     rd_j = ifelse( d_p[i, j] > 0, rd_j_p, rd_j_m);
 
-                    ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 0, 0)# * Int(!third_order)# * ifelse( ru_i * rd_i > 0, 1, 0)
-                    ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 0, 0)# * Int(!third_order)# * ifelse( ru_j * rd_j > 0, 1, 0)
-                    α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 0, 0)# * Int(!third_order)# * ifelse( ru_n * rd_n > 0, 1, 0)
+                    ω1_i[i, j] = ifelse( abs(ru_i) <= abs(rd_i), 1, 0) * Int(!third_order)# * ifelse( ru_i * rd_i > 0, 1, 0)
+                    ω1_j[i, j] = ifelse( abs(ru_j) <= abs(rd_j), 1, 0) * Int(!third_order)# * ifelse( ru_j * rd_j > 0, 1, 0)
+                    α1[i, j] = ifelse( abs(ru_n) <= abs(rd_n), 1, 0) * Int(!third_order)# * ifelse( ru_n * rd_n > 0, 1, 0)
 
                     ω2_i[i, j] = ( 1 - ω1_i[i, j] )# * ifelse( ru_i * rd_i > 0, 1, 0);
                     ω2_j[i, j] = ( 1 - ω1_j[i, j] )# * ifelse( ru_j * rd_j > 0, 1, 0);
@@ -426,12 +426,14 @@ println("=============================")
 d_phi_x = zeros(N + 3, N + 3);
 d_phi_y = zeros(N + 3, N + 3);
 
-for i = 5:length(x)-5
-for j = 5:length(y)-5
-   d_phi_x[i, j] = (phi[i + 1, j, end-1] - phi[i, j, end-1]) / h;
-   d_phi_y[i, j] = (phi[i, j + 1, end-1] - phi[i, j, end-1]) / h;
+
+for i = 2:1:N+2
+for j = 2:1:N+2
+    d_phi_x[i, j] = sign(c_p[i,j]) * (phi[i + 1, j, end-1] - phi[i, j, end-1]) / h - sign(c_m[i,j]) * (phi[i, j, end-1] - phi[i - 1, j, end-1]) / h;
+    d_phi_y[i, j] = sign(d_p[i,j]) * (phi[i, j + 1, end-1] - phi[i, j, end-1]) / h - sign(d_m[i,j]) * (phi[i, j, end-1] - phi[i, j - 1, end-1]) / h;
 end
 end
+
 
 println("minimum derivative x: ", minimum(d_phi_x))
 println("maximum derivative x: ", maximum(d_phi_x))

@@ -42,6 +42,11 @@ function nonSmooth(x)
     end
 end
 
+# Distance function
+function distanceFunction(x, y, center = [0.0, 0.0])
+    return sqrt((x - center[1])^2 + (y - center[2])^2)
+end
+
 function allInOne(x)
     if - 0.8 <= x < -0.4
         return 1

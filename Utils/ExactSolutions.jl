@@ -90,6 +90,13 @@ function exactLozanoAslam(x, t)
     end
 end
 
+function rotateLevelSetSmooth(x, y, t, δ, center = [0.0, 0.0]) 
+    x_rot = x .* cos(t) + y .* sin(t) - center[1]
+    y_rot = -x .* sin(t) + y .* cos(t) - center[2]
+ 
+    return max(0, sqrt(x_rot^2 + y_rot^2) - δ * t)
+end
+
 # Exact solution for the derivative of the Burgers' equation for smooth initial condition
 function exactSmoothBurgersDerivative(x, t)
     try

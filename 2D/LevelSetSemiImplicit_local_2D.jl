@@ -13,36 +13,37 @@ include("../Utils/Utils.jl")
 
 ## Definition of basic parameters
 
-third_order = false;
+third_order = true;
 
 # Level of refinement
-level = 0;
+level = 2;
 
-K = 3 # Number of iterations for the second order correction
+K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 0.1;
+C = 4.0;
 
 # Grid settings
-xL = -3
-xR = 3
+xL = 0.0
+xR = 0.5
 yL = xL
 yR = xR
 N = 40 * 2^level
 h = (xR - xL) / N
 
-# Velocity
-u(x, y) = 1
-v(x, y) = -1
+# Velocity field
+u(x, y) = -y
+v(x, y) = x
+
+# Shrinking ( negative ) or expanding ( positive ) velocity field
+δ = 0.0;
+center = [0.25, 0.0]
 
 # Initial condition
-# phi_0(x, y) = x.^2 + y.^2
-phi_0(x, y) = piecewiseLinear2D(x, y);
-# phi_0(x, y) = exp.(-10 * (x.^2 + y.^2));
-# phi_0(x,y) = 0.8*exp.(-(x.^2 + y.^2)/1.7);
+phi_0(x, y) = distanceFunction(x, y, center)
 
 # Exact solution
-phi_exact(x, y, t) = phi_0.(x - u(x,y) .* t, y - v(x,y) .* t);          
+phi_exact(x, y, t) = rotateLevelSetSmooth(x, y, t, δ, center)
 
 ## INITIALIZATION ===============================================================================================
 
@@ -54,8 +55,7 @@ X = repeat(x, 1, length(y))
 Y = repeat(y, 1, length(x))'
 
 # Time
-Tfinal = 1 * π / sqrt(7) * 1 / 5
-Ntau = 1 * 2^level
+Tfinal = π / 4
 tau = C * h / maximum(max(abs.(u.(x, y)), abs.(v.(x, y))))
 Ntau = Int(round(Tfinal / tau))
 
@@ -164,7 +164,7 @@ end
 
 @time begin
 
-# Precompute predictors for the initial time step
+# Precompute predictors for the initial time
 for sweep in 1:4
     swI, swJ = sweep_cases[sweep]
 
@@ -205,6 +205,7 @@ for n = 2:Ntau + 1
         swI_m, swJ_m = sweep_cases_mask[sweep]
 
         phi_predictor_i[1:end] = phi2_old_[swI[1], 1:end];
+
         if sweep % 2 == 1
             for j = swJ_m[2:end-1]
                 empty!(phi_predictor_j[j]);
@@ -387,16 +388,24 @@ for n = 2:Ntau + 1
                     phi2[i, j, n + 1] = phi[i, j, n + 1];
 
                 end
-            #     phi[N + 3, j, n + 1] = 3 * phi[N + 2, j, n + 1] - 3 * phi[N + 1, j, n + 1] + phi[N, j, n + 1];
-            #     phi2[N + 3, j, n + 1] = 3 * phi2[N + 2, j, n + 1] - 3 * phi2[N + 1, j, n + 1] + phi2[N, j, n + 1];
-            #     phi1[N + 3, j, n + 1] = 3 * phi1[N + 2, j, n + 1] - 3 * phi1[N + 1, j, n + 1] + phi1[N, j, n + 1];
             end
-            # phi[i, N + 3, n + 1] = 3 * phi[i, N + 2, n + 1] - 3 * phi[i, N + 1, n + 1] + phi[i, N, n + 1];
-            # phi2[i, N + 3, n + 1] = 3 * phi2[i, N + 2, n + 1] - 3 * phi2[i, N + 1, n + 1] + phi2[i, N, n + 1];
-            # phi1[i, N + 3, n + 1] = 3 * phi1[i, N + 2, n + 1] - 3 * phi1[i, N + 1, n + 1] + phi1[i, N, n + 1];
+            phi[:, N + 2, n + 1] = 3 * phi[:, N + 1, n + 1] - 3 * phi[:, N, n + 1] + phi[:, N - 1, n + 1];
+            phi2[:, N + 2, n + 1] = 3 * phi2[:, N + 1, n + 1] - 3 * phi2[:, N, n + 1] + phi2[:, N - 1, n + 1];
+            phi1[:, N + 2, n + 1] = 3 * phi1[:, N + 1, n + 1] - 3 * phi1[:, N, n + 1] + phi1[:, N - 1, n + 1];
+            phi_first_order[:, N + 2, n + 1] = 3 * phi_first_order[:, N + 1, n + 1] - 3 * phi_first_order[:, N, n + 1] + phi_first_order[:, N - 1, n + 1];
+            phi[:, N + 3, n + 1] = 3 * phi[:, N + 2, n + 1] - 3 * phi[:, N + 1, n + 1] + phi[:, N, n + 1];
+            phi2[:, N + 3, n + 1] = 3 * phi2[:, N + 2, n + 1] - 3 * phi2[:, N + 1, n + 1] + phi2[:, N, n + 1];
+            phi1[:, N + 3, n + 1] = 3 * phi1[:, N + 2, n + 1] - 3 * phi1[:, N + 1, n + 1] + phi1[:, N, n + 1];
+            phi_first_order[:, N + 3, n + 1] = 3 * phi_first_order[:, N + 2, n + 1] - 3 * phi_first_order[:, N + 1, n + 1] + phi_first_order[:, N, n + 1];
         end
-        # phi_first_order[N + 3, :, n + 1] = 3 * phi_first_order[N + 2, :, n + 1] - 3 * phi_first_order[N + 1, :, n + 1] + phi_first_order[N, :, n + 1];
-        # phi_first_order[:, N + 3, n + 1] = 3 * phi_first_order[:, N + 2, n + 1] - 3 * phi_first_order[:, N + 1, n + 1] + phi_first_order[:, N, n + 1];
+        phi[2, :, n + 1] = 3 * phi[3, :, n + 1] - 3 * phi[4, :, n + 1] + phi[5, :, n + 1];
+        phi2[2, :, n + 1] = 3 * phi2[3, :, n + 1] - 3 * phi2[4, :, n + 1] + phi2[5, :, n + 1];
+        phi1[2, :, n + 1] = 3 * phi1[3, :, n + 1] - 3 * phi1[4, :, n + 1] + phi1[5, :, n + 1];
+        phi_first_order[2, :, n + 1] = 3 * phi_first_order[3, :, n + 1] - 3 * phi_first_order[4, :, n + 1] + phi_first_order[5, :, n + 1];
+        phi[1, :, n + 1] = 3 * phi[2, :, n + 1] - 3 * phi[3, :, n + 1] + phi[4, :, n + 1];
+        phi2[1, :, n + 1] = 3 * phi2[2, :, n + 1] - 3 * phi2[3, :, n + 1] + phi2[4, :, n + 1];
+        phi1[1, :, n + 1] = 3 * phi1[2, :, n + 1] - 3 * phi1[3, :, n + 1] + phi1[4, :, n + 1];
+        phi_first_order[1, :, n + 1] = 3 * phi_first_order[2, :, n + 1] - 3 * phi_first_order[3, :, n + 1] + phi_first_order[4, :, n + 1];
     end
 end
 
@@ -458,7 +467,7 @@ plot_phi
 # d_phi_y = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_y)
 
 # Plot derivative
-trace1_d_x = surface(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
 trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
 
 plot_phi_d_x = plot([trace1_d_x])

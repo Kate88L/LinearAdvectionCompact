@@ -232,7 +232,8 @@ for n = 2:Ntau + 1
                                                                           - d_m[i, j] * phi_first_order[i, j + 1, n + 1] ) / ( 1 + c_p[i, j] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
 
                 
-                if (sweep > 2 && c_p[i, j] > 0) || (sweep % 2 == 0 && d_p[i, j] > 0) && third_order
+                if (sweep > 2 && c_p[i, j] > 0) || (sweep % 2 == 0 && d_p[i, j] > 0) || 
+                    ( sweep <= 2 && c_m[i, j] < 0 ) ||  (sweep % 2 == 1 && d_m[i, j] < 0) && third_order
                     continue
                 end
 

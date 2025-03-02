@@ -16,7 +16,7 @@ include("../Utils/Utils.jl")
 third_order = false;
 
 # Level of refinement
-level = 0;
+level = 3;
 
 K = 1 # Number of iterations for the second order correction
 
@@ -55,7 +55,7 @@ X = repeat(x, 1, length(y))
 Y = repeat(y, 1, length(x))'
 
 # Time
-Tfinal = π / 8
+Tfinal = π / 4
 tau = C * h / maximum(max(abs.(u.(x, y)), abs.(v.(x, y))))
 Ntau = Int(round(Tfinal / tau))
 
@@ -281,20 +281,15 @@ for n = 2:Ntau + 1
             end
         end
 
-        # Compute the linearized velocity field
-        for i = swI
-            for j = swJ
-                # Compute the linearized velocity field
-                global c1_p, c1_m, d1_p, d1_m = courant_numbers(phi2, i, j, n - 1)
-
-                c_p[i, j], c_m[i, j], d_p[i, j], d_m[i, j] = courant_numbers(phi2, i, j, n)
-            end
-        end
-
         for i = swI
             phi_predictor_i[swJ_m[1:2]] = ifelse(sweep < 3, phi2_old_[i + 1, swJ_m[1:2]], phi2_old_[i - 1, swJ_m[1:2]]);  
             phi_predictor_j[swJ_m[2]][2] = phi2_old_[i, swJ[1]]
             for j = swJ
+
+                # Compute the linearized velocity field
+                global c1_p, c1_m, d1_p, d1_m = courant_numbers(phi2, i, j, n - 1)
+
+                c_p[i, j], c_m[i, j], d_p[i, j], d_m[i, j] = courant_numbers(phi2, i, j, n)
 
                 # First order solution
                 phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + c_p[i, j] * phi_first_order[i - 1, j, n + 1] 

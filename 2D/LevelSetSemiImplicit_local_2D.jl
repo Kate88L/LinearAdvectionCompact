@@ -13,15 +13,15 @@ include("../Utils/Utils.jl")
 
 ## Definition of basic parameters
 
-third_order = true;
+third_order = false;
 
 # Level of refinement
-level = 2;
+level = 0;
 
 K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 4.0;
+C = 10.0;
 
 # Grid settings
 xL = 0.0
@@ -36,7 +36,7 @@ u(x, y) = -y
 v(x, y) = x
 
 # Shrinking ( negative ) or expanding ( positive ) velocity field
-δ = 0.0;
+δ = -0.05 / π
 center = [0.25, 0.0]
 
 # Initial condition
@@ -55,11 +55,11 @@ X = repeat(x, 1, length(y))
 Y = repeat(y, 1, length(x))'
 
 # Time
-Tfinal = π / 4
+Tfinal = π / 8
 tau = C * h / maximum(max(abs.(u.(x, y)), abs.(v.(x, y))))
 Ntau = Int(round(Tfinal / tau))
 
-# Ntau = 1
+# Ntau = 3
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
@@ -70,6 +70,12 @@ c_p = max.(c, 0) # Positive part
 c_m = min.(c, 0) # Negative part
 d_p = max.(d, 0) # Positive part 
 d_m = min.(d, 0) # Negative part
+
+# Add time dimension to courant numbers
+# c_p = repeat(c_p, 1, 1, Ntau + 3)
+# c_m = repeat(c_m, 1, 1, Ntau + 3)
+# d_p = repeat(d_p, 1, 1, Ntau + 3)
+# d_m = repeat(d_m, 1, 1, Ntau + 3)
 
 # predictor
 phi1 = zeros(N + 3, N + 3, Ntau + 3);
@@ -160,6 +166,56 @@ for n = 2:Ntau + 3
     phi_first_order[:, N + 3, n] = phi_exact.(x, y[N + 3], t[n]);
 end
 
+# Rouy-Tourin scheme
+function rouy_tourin(f, i, j, n) 
+    dfx = 0.0;
+    dfy = 0.0;
+
+    if f[i - 1, j, n] < min( phi[i, j, n], f[i + 1, j, n] )
+        dfx = ( phi[i, j, n] - f[i - 1, j, n] ) / h;
+    elseif f[i + 1, j, n] < min( phi[i, j, n], f[i - 1, j, n] )
+        dfx = ( f[i + 1, j, n] - phi[i, j, n] ) / h;
+    end
+
+    if f[i, j - 1, n] < min( phi[i, j, n], f[i, j + 1, n] )
+        dfy = ( phi[i, j, n] - f[i, j - 1, n] ) / h;
+    elseif f[i, j + 1, n] < min( phi[i, j, n], f[i, j - 1, n] )
+        dfy = ( f[i, j + 1, n] - phi[i, j, n] ) / h;
+    end
+
+    return dfx, dfy
+end
+
+# Define function that will compute the linearized vecolity field
+function velocity(f, i, j, n)
+    # Rouy-Tourin scheme
+    dfx, dfy = rouy_tourin(f, i, j, n) 
+
+    # Norm of the gradient
+    norm = sqrt(dfx^2 + dfy^2 + ϵ^2);
+    
+    # Compute the linearized velocity field
+    velocity = [ u(x[i], y[j]) + δ * dfx / norm, v(x[i], y[j]) + δ * dfy / norm ]
+
+    return velocity
+end
+
+# Return current courant numbers
+function courant_numbers(f, i, j, n)
+    vel = velocity(f, i, j, n)
+    c = vel[1] * tau / h
+    d = vel[2] * tau / h
+    c_p = max(c, 0)
+    c_m = min(c, 0)
+    d_p = max(d, 0)
+    d_m = min(d, 0)
+
+    return c_p, c_m, d_p, d_m
+end
+
+c1_p, c1_m, d1_p, d1_m = 0.0, 0.0, 0.0, 0.0
+
+
 ## MAIN LOOP ====================================================================================================
 
 @time begin
@@ -170,10 +226,15 @@ for sweep in 1:4
 
     for i = swI
     for j = swJ
-        phi1[i, j, 2] = ( phi[i, j, 1] + c_p[i, j] * phi[i - 1, j, 2]
-                                       + d_p[i, j] * phi[i, j - 1, 2] 
-                                       - c_m[i, j] * phi[i + 1, j, 2] 
-                                       - d_m[i, j] * phi[i, j + 1, 2] ) / ( 1 + c_p[i, j] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
+
+        # Compute the linearized velocity field
+        global c1_p, c1_m, d1_p, d1_m = courant_numbers(phi1, i, j, 1)
+        c_p[i, j], c_m[i, j], d_p[i, j], d_m[i, j] = courant_numbers(phi, i, j, 2)
+
+        phi1[i, j, 2] = ( phi[i, j, 1] + c1_p * phi[i - 1, j, 2]
+                                       + d1_p * phi[i, j - 1, 2] 
+                                       - c1_m * phi[i + 1, j, 2] 
+                                       - d1_m * phi[i, j + 1, 2] ) / ( 1 + c1_p + d1_p - c1_m - d1_m );
         phi1[i - 1, j, 3] = ( phi[i - 1, j, 2] + c_p[i - 1, j] * phi2[i - 2, j, 3]
                                                + d_p[i - 1, j] * phi2[i - 1, j - 1, 3]
                                                - d_m[i - 1, j] * phi2[i - 1, j + 1, 3] ) / ( 1 + c_p[i - 1, j] + d_p[i - 1, j] - d_m[i - 1, j] );
@@ -220,6 +281,16 @@ for n = 2:Ntau + 1
             end
         end
 
+        # Compute the linearized velocity field
+        for i = swI
+            for j = swJ
+                # Compute the linearized velocity field
+                global c1_p, c1_m, d1_p, d1_m = courant_numbers(phi2, i, j, n - 1)
+
+                c_p[i, j], c_m[i, j], d_p[i, j], d_m[i, j] = courant_numbers(phi2, i, j, n)
+            end
+        end
+
         for i = swI
             phi_predictor_i[swJ_m[1:2]] = ifelse(sweep < 3, phi2_old_[i + 1, swJ_m[1:2]], phi2_old_[i - 1, swJ_m[1:2]]);  
             phi_predictor_j[swJ_m[2]][2] = phi2_old_[i, swJ[1]]
@@ -243,10 +314,10 @@ for n = 2:Ntau + 1
                 phi2_j_old_p = ifelse(sweep % 2 == 1, phi_predictor_j[j-1][2], phi_predictor_j[j+1][2]);
 
                 # FIRST ITERATION 
-                phi1[i, j, n] = ( phi[i, j, n - 1] + c_p[i, j] * phi[i - 1, j, n] 
-                                                   + d_p[i, j] * phi[i, j - 1, n]
-                                                   - c_m[i, j] * phi[i + 1, j, n]
-                                                   - d_m[i, j] * phi[i, j + 1, n] ) / ( 1 + c_p[i, j] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
+                phi1[i, j, n] = ( phi[i, j, n - 1] + c1_p * phi[i - 1, j, n] 
+                                                   + d1_p * phi[i, j - 1, n]
+                                                   - c1_m * phi[i + 1, j, n]
+                                                   - d1_m * phi[i, j + 1, n] ) / ( 1 + c1_p + d1_p - c1_m - d1_m );
                 phi1[i - 1, j, n + 1] = ( phi[i - 1, j, n] + c_p[i - 1, j] * phi[i - 2, j, n + 1] 
                                                            + d_p[i - 1, j] * phi[i - 1, j - 1, n + 1]
                                                            - d_m[i - 1, j] * phi[i - 1, j + 1, n + 1] ) / ( 1 + c_p[i - 1, j] + d_p[i - 1, j] - d_m[i - 1, j] );
@@ -271,7 +342,7 @@ for n = 2:Ntau + 1
                     - d_m[i, j] * ( phi[i, j + 1, n + 1] - 0.5 * ( phi1[i, j, n + 1] - phi[i, j + 1, n + 1] - phi1[i, j + 1, n + 1] + phi[i, j + 2, n + 1] ) ) ) / ( 1 + c_p[i, j] + d_p[i, j] - c_m[i, j] - d_m[i, j] );
                     
                 phi2[i, j, n + 1] = phi[i, j, n + 1];
-
+continue
                 # Compute first order predictor in x direction
                 if sweep < 3 # moving from left to right
                     phi1[i + 1, j, n] = ( phi[i + 1, j, n - 1] + c_p[i + 1, j] * phi[i, j, n] 

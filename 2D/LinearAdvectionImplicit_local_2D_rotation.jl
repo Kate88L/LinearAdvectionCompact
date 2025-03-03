@@ -11,15 +11,15 @@ include("../Utils/ExactSolutions.jl")
 include("../Utils/Utils.jl")
 
 ## Definition of basic parameters
-third_order = true;
+third_order = false;
 
 # Level of refinement
-level = 2;
+level = 4;
 
 K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 4.0;
+C = 3.0;
 
 # Grid settings
 xL = 0.0 #- 2 * π / 2
@@ -30,8 +30,8 @@ N = 40 * 2^level
 h = (xR - xL) / N
 
 # Velocity
-u(x, y) = y
-v(x, y) = -x
+u(x, y) = -y
+v(x, y) = x
 
 # Grid initialization with ghost point on the left and right
 x = range(xL-h, xR+h, length = N + 3)
@@ -46,7 +46,7 @@ phi_0(x, y) = rotatedGaussian(x, y, 0)
 
 # Exact solution
 # phi_exact(x, y, t) = nonSmoothRotation(x, y, t, "clockwise") 
-phi_exact(x, y, t) = rotatedGaussian(x, y, t, "clockwise")       
+phi_exact(x, y, t) = rotatedGaussian(x, y, t)    
 
 # Time
 Tfinal = 0.1
@@ -193,7 +193,7 @@ for n = 2:Ntau + 1
 
     phi2_old_ = copy(phi2[:, :, n + 1]);
 
-    for sweep in 2:2
+    for sweep in 1:4
         swI, swJ = sweep_cases[sweep]
         swI_m, swJ_m = sweep_cases_mask[sweep]
 
@@ -381,16 +381,24 @@ for n = 2:Ntau + 1
                     phi2[i, j, n + 1] = phi[i, j, n + 1];
 
                 end
-                # phi[1, j, n + 1] = 3 * phi[2, j, n + 1] - 3 * phi[3, j, n + 1] + phi[4, j, n + 1];
-                # phi2[1, j, n + 1] = 3 * phi2[2, j, n + 1] - 3 * phi2[3, j, n + 1] + phi2[4, j, n + 1];
-                # phi1[1, j, n + 1] = 3 * phi1[2, j, n + 1] - 3 * phi1[3, j, n + 1] + phi1[4, j, n + 1];
             end
-            # phi[i, N + 3, n + 1] = 3 * phi[i, N + 2, n + 1] - 3 * phi[i, N + 1, n + 1] + phi[i, N, n + 1];
-            # phi2[i, N + 3, n + 1] = 3 * phi2[i, N + 2, n + 1] - 3 * phi2[i, N + 1, n + 1] + phi2[i, N, n + 1];
-            # phi1[i, N + 3, n + 1] = 3 * phi1[i, N + 2, n + 1] - 3 * phi1[i, N + 1, n + 1] + phi1[i, N, n + 1];
+            # phi[:, N + 2, n + 1] = 3 * phi[:, N + 1, n + 1] - 3 * phi[:, N, n + 1] + phi[:, N - 1, n + 1];
+            # phi2[:, N + 2, n + 1] = 3 * phi2[:, N + 1, n + 1] - 3 * phi2[:, N, n + 1] + phi2[:, N - 1, n + 1];
+            # phi1[:, N + 2, n + 1] = 3 * phi1[:, N + 1, n + 1] - 3 * phi1[:, N, n + 1] + phi1[:, N - 1, n + 1];
+            # phi_first_order[:, N + 2, n + 1] = 3 * phi_first_order[:, N + 1, n + 1] - 3 * phi_first_order[:, N, n + 1] + phi_first_order[:, N - 1, n + 1];
+            # phi[:, N + 3, n + 1] = 3 * phi[:, N + 2, n + 1] - 3 * phi[:, N + 1, n + 1] + phi[:, N, n + 1];
+            # phi2[:, N + 3, n + 1] = 3 * phi2[:, N + 2, n + 1] - 3 * phi2[:, N + 1, n + 1] + phi2[:, N, n + 1];
+            # phi1[:, N + 3, n + 1] = 3 * phi1[:, N + 2, n + 1] - 3 * phi1[:, N + 1, n + 1] + phi1[:, N, n + 1];
+            # phi_first_order[:, N + 3, n + 1] = 3 * phi_first_order[:, N + 2, n + 1] - 3 * phi_first_order[:, N + 1, n + 1] + phi_first_order[:, N, n + 1];
         end
-        # phi_first_order[N + 3, :, n + 1] = 3 * phi_first_order[N + 2, :, n + 1] - 3 * phi_first_order[N + 1, :, n + 1] + phi_first_order[N, :, n + 1];
-        # phi_first_order[:, N + 3, n + 1] = 3 * phi_first_order[:, N + 2, n + 1] - 3 * phi_first_order[:, N + 1, n + 1] + phi_first_order[:, N, n + 1];
+        # phi[2, :, n + 1] = 3 * phi[3, :, n + 1] - 3 * phi[4, :, n + 1] + phi[5, :, n + 1];
+        # phi2[2, :, n + 1] = 3 * phi2[3, :, n + 1] - 3 * phi2[4, :, n + 1] + phi2[5, :, n + 1];
+        # phi1[2, :, n + 1] = 3 * phi1[3, :, n + 1] - 3 * phi1[4, :, n + 1] + phi1[5, :, n + 1];
+        # phi_first_order[2, :, n + 1] = 3 * phi_first_order[3, :, n + 1] - 3 * phi_first_order[4, :, n + 1] + phi_first_order[5, :, n + 1];
+        # phi[1, :, n + 1] = 3 * phi[2, :, n + 1] - 3 * phi[3, :, n + 1] + phi[4, :, n + 1];
+        # phi2[1, :, n + 1] = 3 * phi2[2, :, n + 1] - 3 * phi2[3, :, n + 1] + phi2[4, :, n + 1];
+        # phi1[1, :, n + 1] = 3 * phi1[2, :, n + 1] - 3 * phi1[3, :, n + 1] + phi1[4, :, n + 1];
+        # phi_first_order[1, :, n + 1] = 3 * phi_first_order[2, :, n + 1] - 3 * phi_first_order[3, :, n + 1] + phi_first_order[4, :, n + 1];
     end
 end
 
@@ -450,8 +458,8 @@ plot_phi
 # d_phi_y = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_y)
 
 # Plot derivative
-trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
-trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
 
 plot_phi_d_x = plot([trace1_d_x])
 plot_phi_d_y = plot([trace1_d_y])

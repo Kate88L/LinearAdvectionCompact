@@ -15,7 +15,7 @@ include("Utils/Utils.jl")
 third_order = true;
 
 # Level of refinement
-level = 4;
+level = 3;
 
 K = 1; # Number of iterations for the second order correction
 
@@ -30,8 +30,8 @@ h = (xR - xL) / Nx
 
 # Velocity
 # u(x) = 1 + 3/4 * cos(x)
-# u(x) = 2 + 3/2 * cos(x)
-u(x) = 1
+u(x) = 2 + 3/2 * cos(x)
+# u(x) = 1
 
 # Initial condition
 # phi_0(x) = asin( sin(x + π/2) ) * 2 / π;
@@ -42,8 +42,8 @@ phi_0(x) = cos.(x);
 
 # Exact solution
 # phi_exact(x, t) = cosVelocityNonSmooth(x, t); 
-# phi_exact(x, t) = cosVelocitySmooth(x, t);
-phi_exact(x, t) = phi_0.(x - t * u.(x));             
+phi_exact(x, t) = cosVelocitySmooth(x, t);
+# phi_exact(x, t) = phi_0.(x - t * u.(x));             
 
 ## Comptutation
 
@@ -123,9 +123,10 @@ end
 # Time Loop
 for n = 2:Ntau + 1
 
-    phi1[3, n] = ( phi[3, n - 1] + c[3] * phi[2, n] ) / ( 1 + c[3] );
+    # phi1[3, n] = ( phi[3, n - 1] + c[3] * phi[2, n] ) / ( 1 + c[3] );
 
-    global phi_i_predictor = ( phi[3, n] - 1/2 * ( -phi1[3, n] + phi[3 , n - 1] ) + c[3] * ( phi2[2, n + 1] - 1/2 * ( -phi1[2, n + 1] + phi[1, n + 1] ) ) ) / ( 1 + c[3] );
+    # global phi_i_predictor = ( phi[3, n] - 1/2 * ( -phi1[3, n] + phi[3 , n - 1] ) + c[3] * ( phi2[2, n + 1] - 1/2 * ( -phi1[2, n + 1] + phi[1, n + 1] ) ) ) / ( 1 + c[3] );
+    global phi_i_predictor = phi2[3, n + 1];
 
     for i = 3:1:Nx + 2
 

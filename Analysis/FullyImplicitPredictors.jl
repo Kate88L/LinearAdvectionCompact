@@ -76,7 +76,7 @@ uP_im_nm = ( u_im_nmm + cm * u_imm_nm ) / ( Sym(1) + cm) # predictor for u_i-1_n
 S_x = ( u_i_n - u_im_n ) / h + ω * ( u_ip_n -  Sym(2)* u_i_n + u_im_n ) / ( Sym(2)* h) + ( Sym(1) - ω) * ( u_i_n -  Sym(2)* u_im_n + u_imm_n ) / (  Sym(2)* h )
 S_t = ( u_i_n - u_i_nm ) / tau + α * ( u_i_np -  Sym(2)* u_i_n + u_i_nm ) / (  Sym(2)* tau ) + ( Sym(1) - α) * ( u_i_n -  Sym(2)* u_i_nm + u_i_nmm ) / (  Sym(2)* tau )
 
-# Second order predictor for u_i_n+1
+# Second order predictor for u_i_n+1 <------ OK
 uP2_i_n = ( u_i_nm -  Sym(1)/ Sym(2)* ( uP_i_n - uP_i_nm - u_i_nm + u_i_nmm ) 
                 + c * ( u_im_n -  Sym(1)/ Sym(2)* ( uP_i_n - uP_im_n - u_im_n + u_imm_n ) ) ) / (  Sym(1) + c )   
                 
@@ -98,29 +98,35 @@ uP_imm_np = ( u_imm_n + cmm * u_immm_np ) / (  Sym(1) + cmm ) # predictor for u_
 uP2_imm_np = ( u_imm_n -  Sym(1) / Sym(2) * ( uP_imm_np - uP_imm_n - u_imm_n + u_imm_nm ) 
                 + cmm * ( u_immm_np -  Sym(1) / Sym(2) * ( uP_imm_np - uP_immm_np - u_immm_np + u_immmm_np ) ) ) / (  Sym(1) + cmm )
 
-uP_im_np = ( u_im_n + cm * uP2_imm_np ) / (  Sym(1) + cm ) # predictor for u_i-1_n+2
+uP_im_np = ( u_im_n + cm * u_imm_np ) / (  Sym(1) + cm ) # predictor for u_i-1_n+2
 
-uP2_im_np = ( uP2_im_n -  Sym(1) / Sym(2) * ( uP_im_np - uP_im_n - uP2_im_n + u_im_nm ) 
-                + cm * ( uP2_imm_np -  Sym(1) / Sym(2) * ( uP_im_np - uP_imm_np - uP2_imm_np + u_immm_np ) ) ) / (  Sym(1) + cm )
+uP2_im_np = ( u_im_n -  Sym(1) / Sym(2) * ( uP_im_np - uP_im_n - u_im_n + u_im_nm ) 
+                + cm * ( u_imm_np -  Sym(1) / Sym(2) * ( uP_im_np - uP_imm_np - u_imm_np + u_immm_np ) ) ) / (  Sym(1) + cm )
 
-uP_i_np = ( uP2_i_n + c * uP2_im_np ) / (  Sym(1) + c ) # predictor for u_i_n+2
+uP_i_np = ( u_i_n + c * u_im_np ) / (  Sym(1) + c ) # predictor for u_i_n+2
 
-uP2_i_np = ( uP2_i_n -  Sym(1) / Sym(2) * ( uP_i_np - uP_i_n - uP2_i_n + u_i_nm ) 
-                + c * ( uP2_im_np -  Sym(1) / Sym(2) * ( uP_i_np - uP_im_np - uP2_im_np + uP2_imm_np ) ) ) / (  Sym(1) + c )
+uP2_i_np = ( u_i_n -  Sym(1) / Sym(2) * ( uP_i_np - uP_i_n - u_i_n + u_i_nm ) 
+                + c * ( u_im_np -  Sym(1) / Sym(2) * ( uP_i_np - uP_im_np - u_im_np + u_imm_np ) ) ) / (  Sym(1) + c )
 
-uP2_i_n_oldN = ( uP2_i_nm -  Sym(1) / Sym(2) * ( uP_i_n - uP_i_nm - uP2_i_nm + u_i_nmm ) 
-                + c * ( uP2_im_n -  Sym(1) / Sym(2) * ( uP_i_n - uP_im_n - uP2_im_n + u_imm_n ) ) ) / (  Sym(1) + c )
+uP2_i_n_oldN = ( u_i_nm -  Sym(1) / Sym(2) * ( uP_i_n - uP_i_nm - u_i_nm + u_i_nmm ) 
+                + c * ( u_im_n -  Sym(1) / Sym(2) * ( uP_i_n - uP_im_n - u_im_n + u_imm_n ) ) ) / (  Sym(1) + c )
 
 uP2_i_n_oldI = ( u_i_nm -  Sym(1) / Sym(2) * ( uP_i_n - uP_i_nm - u_i_nm + u_i_nmm ) 
-                + cp * ( uP2_im_n -  Sym(1)/ Sym(2)* ( uP_i_n - uP_im_n - uP2_im_n + u_imm_n ) ) ) / (  Sym(1) + cp )
+                + cp * ( u_im_n -  Sym(1)/ Sym(2)* ( uP_i_n - uP_im_n - u_im_n + u_imm_n ) ) ) / (  Sym(1) + cp )
 # Final scheme
 S = ( u_i_n - u_i_nm + α / Sym(2) * ( uP2_i_n - uP2_i_nm - u_i_nm + u_i_nmm ) + ( Sym(1) - α ) /  Sym(2) * ( uP2_i_np - uP2_i_n - uP2_i_n_oldN + u_i_nm )
                  + c * ( u_i_n - u_im_n + ω / Sym(2) * ( uP2_i_n - uP2_im_n - u_im_n + u_imm_n ) + ( Sym(1) - ω ) /  Sym(2) * ( uP2_ip_n - uP2_i_n - uP2_i_n_oldI + u_im_n ) ) ) 
 
+S = ( u_i_n - u_i_nm  + Sym(1) / Sym(2) * ( uP2_i_np - uP2_i_n - uP2_i_n + u_i_nm )
+                 + c * ( u_i_n - u_im_n + Sym(1) / Sym(2) * ( uP2_ip_n - uP2_i_n - uP2_i_n + u_im_n ) ) ) 
 
 # Purely upwind scheme
-# S = ( u_i_n - u_i_nm + 1 / Sym(2) * ( uP_i_n - uP_i_nm - u_i_nm + u_i_nmm ) 
-#                 + c * ( u_i_n - u_im_n + 1 / Sym(2) * ( uP_i_n - uP_im_n - u_im_n + u_imm_n )) )
+S = ( u_i_n - u_i_nm + 1 / Sym(2) * ( uP_i_n - uP_i_nm - u_i_nm + u_i_nmm ) 
+                + c * ( u_i_n - u_im_n + 1 / Sym(2) * ( uP_i_n - uP_im_n - u_im_n + u_imm_n )) )
+
+# S = ( u_i_n - u_i_nm + 1 / Sym(2) * ( uP_i_n - u_i_nm - u_i_nm + u_i_nmm ) 
+#                 + c * ( u_i_n - u_im_n + 1 / Sym(2) * ( u_i_n - u_im_n - u_im_n + u_imm_n )) )
+
 
 S = S.subs(c, v * tau / h)
 S = S.subs(DT, - v * DX)
@@ -128,12 +134,17 @@ S = S.subs(DTT, - v * DXT)
 S = S.subs(DXT, - v * DXX - dv * DX)
 S = S.subs(dv, dc * h / tau)
 
-S = S.subs(DTTT, - v^3 * DXXX)
-S = S.subs(DXTT, - v^2 * DXXX)
-S = S.subs(DXXT, - v * DXXX)
+# S = S.subs(DTTT, - v^3 * DXXX)
+# S = S.subs(DXTT, - v^2 * DXXX)
+# S = S.subs(DXXT, - v * DXXX)
 
-S = S.subs(α, Sym(0)) 
-S = S.subs(ω, Sym(0))
+# S = S.subs(α, Sym(0)) 
+# S = S.subs(ω, Sym(0))
+
+# S = S.subs(v, h * c / tau)
+# S = S.subs(c, 1)
+
+
 
 print("\n")
 print(simplify(S))

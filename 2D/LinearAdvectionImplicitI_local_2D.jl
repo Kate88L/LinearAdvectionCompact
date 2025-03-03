@@ -13,15 +13,15 @@ include("../Utils/Utils.jl")
 
 ## Definition of basic parameters
 
-third_order = false;
+third_order = true;
 
 # Level of refinement
-level = 0;
+level = 1;
 
-K = 3 # Number of iterations for the second order correction
+K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 0.1;
+C = 2;
 
 # Grid settings
 xL = -3
@@ -32,12 +32,12 @@ N = 40 * 2^level
 h = (xR - xL) / N
 
 # Velocity
-u(x, y) = 1
-v(x, y) = -1
+u(x, y) = -1.5
+v(x, y) = 1.5
 
 # Initial condition
-# phi_0(x, y) = x.^2 + y.^2
-phi_0(x, y) = piecewiseLinear2D(x, y);
+phi_0(x, y) = x.^3 + y.^3
+# phi_0(x, y) = piecewiseLinear2D(x, y);
 # phi_0(x, y) = exp.(-10 * (x.^2 + y.^2));
 # phi_0(x,y) = 0.8*exp.(-(x.^2 + y.^2)/1.7);
 
@@ -458,8 +458,8 @@ plot_phi
 # d_phi_y = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_y)
 
 # Plot derivative
-trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
-trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
 
 plot_phi_d_x = plot([trace1_d_x])
 plot_phi_d_y = plot([trace1_d_y])

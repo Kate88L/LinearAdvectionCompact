@@ -5,7 +5,7 @@ using PlotlyJS
 using CSV
 using DataFrames
 
-include("Utils/InitialFunctions.jl")
+include("../../Utils/InitialFunctions.jl")
 
 ## Definition of basic parameters
 

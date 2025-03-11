@@ -2,59 +2,54 @@
 
 using LinearAlgebra
 using PlotlyJS
-using CSV 
+using CSV
 using DataFrames
 using JSON
-using DataStructures
 
-include("../Utils/InitialFunctions.jl")
-include("../Utils/ExactSolutions.jl")
-include("../Utils/Utils.jl")
+include("../../Utils/InitialFunctions.jl")
+include("../../Utils/ExactSolutions.jl")
+include("../../Utils/Utils.jl")
 
 ## Definition of basic parameters
-
-third_order = true;
+third_order = false;
 
 # Level of refinement
-level = 1;
+level = 4;
 
 K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 2;
+C = 3.0;
 
 # Grid settings
-xL = -3
-xR = 3
+xL = 0.0 #- 2 * π / 2
+xR = 0.5 #3 * π / 2
 yL = xL
 yR = xR
 N = 40 * 2^level
 h = (xR - xL) / N
 
 # Velocity
-u(x, y) = -1.5
-v(x, y) = 1.5
-
-# Initial condition
-phi_0(x, y) = x.^3 + y.^3
-# phi_0(x, y) = piecewiseLinear2D(x, y);
-# phi_0(x, y) = exp.(-10 * (x.^2 + y.^2));
-# phi_0(x,y) = 0.8*exp.(-(x.^2 + y.^2)/1.7);
-
-# Exact solution
-phi_exact(x, y, t) = phi_0.(x - u(x,y) .* t, y - v(x,y) .* t);          
-
-## INITIALIZATION ===============================================================================================
+u(x, y) = -y
+v(x, y) = x
 
 # Grid initialization with ghost point on the left and right
 x = range(xL-h, xR+h, length = N + 3)
 y = range(yL-h, yR+h, length = N + 3)
 
-X = repeat(x, 1, length(y))
-Y = repeat(y, 1, length(x))'
+X = repeat(x, 1, N + 3)
+Y = repeat(y', N + 3, 1)
+
+# Initial condition
+# phi_0(x, y) = nonSmoothRotation(x, y, 0)
+phi_0(x, y) = rotatedGaussian(x, y, 0)
+
+# Exact solution
+# phi_exact(x, y, t) = nonSmoothRotation(x, y, t, "clockwise") 
+phi_exact(x, y, t) = rotatedGaussian(x, y, t)    
 
 # Time
-Tfinal = 1 * π / sqrt(7) * 1 / 5
+Tfinal = 0.1
 Ntau = 1 * 2^level
 tau = C * h / maximum(max(abs.(u.(x, y)), abs.(v.(x, y))))
 Ntau = Int(round(Tfinal / tau))
@@ -93,33 +88,6 @@ phi_first_order[:, :, 2] = phi_exact.(X, Y, tau);
 
 phi_predictor_i = zeros(N + 3) # vector values needed to predict in space 
 phi_predictor_j = [CircularBuffer{Float64}(2) for _ in 1:N + 3] # buffer  of last 3 values needed to predict in space
-
-# WENO parameters
-ϵ = 1e-16;
-ω0 = 0;
-α0 = 0;
-
-ω1_i = zeros(N + 3, N + 3) .+ ω0;
-ω2_i = zeros(N + 3, N + 3) .+ ω0;
-ω1_j = zeros(N + 3, N + 3) .+ ω0;
-ω2_j = zeros(N + 3, N + 3) .+ ω0;
-α1 = zeros(N + 3, N + 3) .+ α0;
-α2 = zeros(N + 3, N + 3) .+ α0;
-
-# Definition of 4 sweep cases for the fast sweeping method
-sweep_cases = Dict(
-    1 => (3:1:N+1, 3:1:N+1),
-    2 => (3:1:N+1, N+1:-1:3),
-    3 => (N+1:-1:3, 3:1:N+1),
-    4 => (N+1:-1:3, N+1:-1:3)
-)
-
-sweep_cases_mask = Dict(
-    1 => (1:1:N+3, 1:1:N+3),
-    2 => (1:1:N+3, N+3:-1:1),
-    3 => (N+3:-1:1, 1:1:N+3),
-    4 => (N+3:-1:1, N+3:-1:1)
-)
 
 # Boundary conditions
 for n = 2:Ntau + 3
@@ -160,11 +128,36 @@ for n = 2:Ntau + 3
     phi_first_order[:, N + 3, n] = phi_exact.(x, y[N + 3], t[n]);
 end
 
-## MAIN LOOP ====================================================================================================
+# WENO parameters
+ϵ = 1e-16;
+ω0 = 0;
+α0 = 0;
+
+ω1_i = zeros(N + 3, N + 3) .+ ω0;
+ω2_i = zeros(N + 3, N + 3) .+ ω0;
+ω1_j = zeros(N + 3, N + 3) .+ ω0;
+ω2_j = zeros(N + 3, N + 3) .+ ω0;
+α1 = zeros(N + 3, N + 3) .+ α0;
+α2 = zeros(N + 3, N + 3) .+ α0;
+
+# Definition of 4 sweep cases for the fast sweeping method
+sweep_cases = Dict(
+    1 => (3:1:N+1, 3:1:N+1),
+    2 => (3:1:N+1, N+1:-1:3),
+    3 => (N+1:-1:3, 3:1:N+1),
+    4 => (N+1:-1:3, N+1:-1:3)
+)
+
+sweep_cases_mask = Dict(
+    1 => (1:1:N+3, 1:1:N+3),
+    2 => (1:1:N+3, N+3:-1:1),
+    3 => (N+3:-1:1, 1:1:N+3),
+    4 => (N+3:-1:1, N+3:-1:1)
+)
 
 @time begin
 
-# Precompute predictors for the initial time step
+# Precompute predictors for the initial time
 for sweep in 1:4
     swI, swJ = sweep_cases[sweep]
 
@@ -235,6 +228,7 @@ for n = 2:Ntau + 1
                     ( sweep <= 2 && c_m[i, j] < 0 ) ||  (sweep % 2 == 1 && d_m[i, j] < 0) && third_order
                     continue
                 end
+
 
                 phi2_old = phi2_old_[i, j];
                 phi2_i_old_p = phi_predictor_i[j];
@@ -387,16 +381,24 @@ for n = 2:Ntau + 1
                     phi2[i, j, n + 1] = phi[i, j, n + 1];
 
                 end
-            #     phi[N + 3, j, n + 1] = 3 * phi[N + 2, j, n + 1] - 3 * phi[N + 1, j, n + 1] + phi[N, j, n + 1];
-            #     phi2[N + 3, j, n + 1] = 3 * phi2[N + 2, j, n + 1] - 3 * phi2[N + 1, j, n + 1] + phi2[N, j, n + 1];
-            #     phi1[N + 3, j, n + 1] = 3 * phi1[N + 2, j, n + 1] - 3 * phi1[N + 1, j, n + 1] + phi1[N, j, n + 1];
             end
-            # phi[i, N + 3, n + 1] = 3 * phi[i, N + 2, n + 1] - 3 * phi[i, N + 1, n + 1] + phi[i, N, n + 1];
-            # phi2[i, N + 3, n + 1] = 3 * phi2[i, N + 2, n + 1] - 3 * phi2[i, N + 1, n + 1] + phi2[i, N, n + 1];
-            # phi1[i, N + 3, n + 1] = 3 * phi1[i, N + 2, n + 1] - 3 * phi1[i, N + 1, n + 1] + phi1[i, N, n + 1];
+            # phi[:, N + 2, n + 1] = 3 * phi[:, N + 1, n + 1] - 3 * phi[:, N, n + 1] + phi[:, N - 1, n + 1];
+            # phi2[:, N + 2, n + 1] = 3 * phi2[:, N + 1, n + 1] - 3 * phi2[:, N, n + 1] + phi2[:, N - 1, n + 1];
+            # phi1[:, N + 2, n + 1] = 3 * phi1[:, N + 1, n + 1] - 3 * phi1[:, N, n + 1] + phi1[:, N - 1, n + 1];
+            # phi_first_order[:, N + 2, n + 1] = 3 * phi_first_order[:, N + 1, n + 1] - 3 * phi_first_order[:, N, n + 1] + phi_first_order[:, N - 1, n + 1];
+            # phi[:, N + 3, n + 1] = 3 * phi[:, N + 2, n + 1] - 3 * phi[:, N + 1, n + 1] + phi[:, N, n + 1];
+            # phi2[:, N + 3, n + 1] = 3 * phi2[:, N + 2, n + 1] - 3 * phi2[:, N + 1, n + 1] + phi2[:, N, n + 1];
+            # phi1[:, N + 3, n + 1] = 3 * phi1[:, N + 2, n + 1] - 3 * phi1[:, N + 1, n + 1] + phi1[:, N, n + 1];
+            # phi_first_order[:, N + 3, n + 1] = 3 * phi_first_order[:, N + 2, n + 1] - 3 * phi_first_order[:, N + 1, n + 1] + phi_first_order[:, N, n + 1];
         end
-        # phi_first_order[N + 3, :, n + 1] = 3 * phi_first_order[N + 2, :, n + 1] - 3 * phi_first_order[N + 1, :, n + 1] + phi_first_order[N, :, n + 1];
-        # phi_first_order[:, N + 3, n + 1] = 3 * phi_first_order[:, N + 2, n + 1] - 3 * phi_first_order[:, N + 1, n + 1] + phi_first_order[:, N, n + 1];
+        # phi[2, :, n + 1] = 3 * phi[3, :, n + 1] - 3 * phi[4, :, n + 1] + phi[5, :, n + 1];
+        # phi2[2, :, n + 1] = 3 * phi2[3, :, n + 1] - 3 * phi2[4, :, n + 1] + phi2[5, :, n + 1];
+        # phi1[2, :, n + 1] = 3 * phi1[3, :, n + 1] - 3 * phi1[4, :, n + 1] + phi1[5, :, n + 1];
+        # phi_first_order[2, :, n + 1] = 3 * phi_first_order[3, :, n + 1] - 3 * phi_first_order[4, :, n + 1] + phi_first_order[5, :, n + 1];
+        # phi[1, :, n + 1] = 3 * phi[2, :, n + 1] - 3 * phi[3, :, n + 1] + phi[4, :, n + 1];
+        # phi2[1, :, n + 1] = 3 * phi2[2, :, n + 1] - 3 * phi2[3, :, n + 1] + phi2[4, :, n + 1];
+        # phi1[1, :, n + 1] = 3 * phi1[2, :, n + 1] - 3 * phi1[3, :, n + 1] + phi1[4, :, n + 1];
+        # phi_first_order[1, :, n + 1] = 3 * phi_first_order[2, :, n + 1] - 3 * phi_first_order[3, :, n + 1] + phi_first_order[4, :, n + 1];
     end
 end
 
@@ -426,14 +428,12 @@ println("=============================")
 d_phi_x = zeros(N + 3, N + 3);
 d_phi_y = zeros(N + 3, N + 3);
 
-
 for i = 2:1:N+2
-for j = 2:1:N+2
-    d_phi_x[i, j] = sign(c_p[i,j]) * (phi[i + 1, j, end-1] - phi[i, j, end-1]) / h - sign(c_m[i,j]) * (phi[i, j, end-1] - phi[i - 1, j, end-1]) / h;
-    d_phi_y[i, j] = sign(d_p[i,j]) * (phi[i, j + 1, end-1] - phi[i, j, end-1]) / h - sign(d_m[i,j]) * (phi[i, j, end-1] - phi[i, j - 1, end-1]) / h;
+    for j = 2:1:N+2
+        d_phi_x[i, j] = sign(c_p[i,j]) * (phi[i + 1, j, end-1] - phi[i, j, end-1]) / h - sign(c_m[i,j]) * (phi[i, j, end-1] - phi[i - 1, j, end-1]) / h;
+        d_phi_y[i, j] = sign(d_p[i,j]) * (phi[i, j + 1, end-1] - phi[i, j, end-1]) / h - sign(d_m[i,j]) * (phi[i, j, end-1] - phi[i, j - 1, end-1]) / h;
+    end
 end
-end
-
 
 println("minimum derivative x: ", minimum(d_phi_x))
 println("maximum derivative x: ", maximum(d_phi_x))
@@ -449,7 +449,7 @@ trace1 = contour(x = x, y = y, z = phi_first_order[:, :, end - 1]', mode = "line
 layout = Layout(plot_bgcolor="white", 
                 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 # plot_phi = plot([ trace2, trace1,trace5, trace4, trace3], layout)
-plot_phi = plot([ trace3, trace2, trace1 ], layout)
+plot_phi = plot([ trace3, trace1, trace2 ], layout)
 
 plot_phi
 

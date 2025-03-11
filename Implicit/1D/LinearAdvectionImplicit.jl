@@ -1,20 +1,23 @@
-#  noniterative 2nd order fully implicitscheme for linear advection equation
+# TVD scheme for linear advection equation
 
 using LinearAlgebra
 using PlotlyJS
 using CSV 
 using DataFrames
 
-include("Utils/InitialFunctions.jl")
-include("Utils/ExactSolutions.jl")
+include("../../Utils/InitialFunctions.jl")
+include("../../Utils/ExactSolutions.jl")
 
 ## Definition of basic parameters
 
 # Level of refinement
-level = 2;
+level = 0;
+
+# Level of correction
+p = 4;
 
 # Courant number
-C = 0.1;
+C = 1;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -39,11 +42,11 @@ phi_exact(x, t) = phi_0.(x - t);
 
 ## Comptutation
 
-# Grid initialization with ghost point on the right
+# Grid initialization
 x = range(xL, xR+h, length = Nx + 2)
 
 # Time
-T = 1 * π / sqrt(7) * 2
+T = 8 * π / sqrt(7) * 2
 # T = π / sqrt(3)
 # tau = C * h / u
 Ntau = 1 * 2^level
@@ -51,7 +54,7 @@ tau = T / Ntau
 tau = C * h / maximum(u.(x))
 Ntau = Int(round(T / tau))
 
-# Ntau = 16
+# Ntau = 4
 
 c = zeros(Nx+2) .+ u.(x) * tau / h
 
@@ -81,6 +84,9 @@ phi_predictor_n2[1, :] = phi_exact.(x[1], range(tau, (Ntau + 1) * tau, length = 
 # phi_predictor_n2[end, :] = phi_exact.(x[end], range(tau, (Ntau + 1) * tau, length = Ntau + 1));
 
 
+# Ghost point on the right side 
+# PF we want to use predicted values for the ghost point on the right
+# ghost_point_right = phi_exact.(xR + h, range(0, (Ntau) * tau, length = Ntau + 1));
 # Ghost point on the left side 
 ghost_point_left = phi_exact.(xL - h, range(0, (Ntau) * tau, length = Ntau + 1));
 # Ghost point on the time -1
@@ -89,7 +95,7 @@ ghost_point_time = phi_exact.(x, -tau);
 # WENO parameters
 ϵ = 1e-16;
 ω0 = 0/3;
-α0 = 0/3;
+α0 = 1/2;
 
 ω = zeros(Nx + 1) .+ ω0;
 α = zeros(Nx + 1) .+ α0;
@@ -106,43 +112,70 @@ for n = 1:Ntau
         phi_old = ghost_point_time;
     end
 
-    # Solve linear system - fast sweeping
-    for i = 2:1:Nx + 1
+    # Number of corrector steps
+    for j = 1:p
 
-        if i > 2
-            phi_left = phi[i - 2, n + 1];
-        else
-            phi_left = ghost_point_left[n + 1];
+        # Prepare predictors
+        for i = 2:1:Nx + 2
+
+            # First order solution
+            phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            
+            # Predictor
+            phi_predictor_i[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+
+            # predictor in time n
+            # phi_predictor_n[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_n[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            phi_predictor_n[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+
+            # Predictor in time n + 2 preparation
+            if n < 2
+                phi_predictor_n2[i, n + 1] = ( phi_predictor_n[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            end
         end
 
-        # First order solution
-        phi_first_order[i, n + 1] = ( phi_first_order[i, n] + abs(c[i]) * (c[i] > 0) * phi_first_order[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
-            
-        # Predictors
-        phi_predictor_i[i - 1, n + 1] = ( phi[i - 1, n] + abs(c[i-1]) * (c[i-1] > 0) * phi_left ) / ( 1 + abs(c[i-1]) );
-        phi_predictor_i[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi_predictor_i[i-1,n+1] ) / ( 1 + abs(c[i]) );
+        # Solve linear system - fast sweeping
+        for i = 2:1:Nx + 1
 
-        phi_predictor_n[i, n    ] = ( phi_old[i]             + abs(c[i]) * (c[i] > 0) * phi[i-1,n  ]) / ( 1 + abs(c[i]) );
-        phi_predictor_n[i, n + 1] = ( phi_predictor_n[i, n]  + abs(c[i]) * (c[i] > 0) * phi[i-1,n+1]) / ( 1 + abs(c[i]) );
+            if i > 2
+                phi_left = phi[i - 2, n + 1];
+            else
+                phi_left = ghost_point_left[n + 1];
+            end
 
-        phi[i, n + 1] = ( phi[i, n] + abs(c[i]) * (c[i] > 0) * phi[i - 1,n + 1] ) / ( 1 + abs(c[i]) );
-        phi_predictor_i[i + 1, n + 1] = ( phi[i + 1, n] + abs(c[i+1]) * (c[i+1] > 0) * phi[i,n+1] ) / ( 1 + abs(c[i+1]) );
-        phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
-    
-        phi[i, n + 1] =  ( phi[i, n] 
-            - α[i] / 2 * ( phi_predictor_n2[i, n + 1] - 2*phi_predictor_n[i, n + 1] + phi_predictor_n[i, n] ) 
-            - ( 1 - α[i] ) / 2 * ( - 2 * phi[i, n] + phi_old[i] ) 
-            + c[i] * ( phi[i-1, n+1] 
-            - ( ω[i] / 2 )* (phi_predictor_i[i + 1, n + 1] - 2*phi_predictor_i[i, n + 1] + phi_predictor_i[i - 1, n + 1]) 
-            - ( (1 - ω[i]) / 2 )* ( - 2 * phi[i - 1, n + 1] + phi_left) ) ) / (1 + (1 - α[i]) / 2 + c[i] * (1 + (1 - ω[i]) / 2) );
+            # if i < Nx + 1
+            #     phi_right = phi_predictor_i[i + 1, n + 1];
+            # else
+            #     phi_right = ghost_point_right[n + 1];
+            # end
 
-        phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+            phi_right = phi_predictor_i[i + 1, n + 1];
 
+            phi[i, n + 1] =  ( phi[i, n] - α[i] / 2 * ( phi_predictor_n2[i, n + 1] - 2 * phi_predictor_n[i, n + 1] + phi_predictor_n[i, n] ) - ( 1 - α[i] ) / 2 * ( - 2 * phi[i, n] + phi_old[i] ) + 
+                                        c[i] * ( phi[i-1, n+1] - ( ω[i] / 2 )* (phi_right - 2 * phi_predictor_i[i, n + 1] + phi_predictor_i[i - 1, n + 1]) -
+                                         ( (1 - ω[i]) / 2 )* ( - 2 * phi[i - 1, n + 1] + phi_left) ) ) / (1 + (1 - α[i]) / 2 + c[i] * (1 + (1 - ω[i]) / 2) );
+
+            # Update predictor in time n + 2
+            phi_predictor_n2[i, n + 1] = ( phi[i, n + 1] + abs(c[i]) * (c[i] > 0) * phi_predictor_n2[i - 1, n + 1] ) / ( 1 + abs(c[i]) );
+
+        end
+        i = Nx +2;
+        phi[i, n + 1] = 2*phi[i-1, n + 1] - phi[i-2, n + 1];
+
+        # compute convergence
+        # S = 0;
+        # for i = 3:1:Nx 
+        #     S += abs(phi[i, n + 1] - phi[i, n] + 0.5 * (phi[i, n + 1] - 2 * phi[i, n] + phi_old[i]) + 
+        #     c[i] * ( phi[i, n + 1] - phi[i - 1, n + 1] + ω[i] / 2 * (phi[i + 1, n + 1] - 2 * phi[i, n + 1] + phi[i - 1, n + 1]) + 
+        #     (1 - ω[i]) / 2 * ( phi[i, n + 1] - 2 * phi[i - 1, n + 1] + phi[i - 2, n + 1]) ));
+        # end
+        # # println("Step: ", j, " S: ", S)
+
+        # if ( S < 1e-4 )
+        #     println("Converged in step: ", j, " is " , S)
+        #     break
+        # end
     end
-
-    # Extrapolation
-    i = Nx + 2;
-    phi[i, n + 1] = 2*phi[i-1, n + 1] - phi[i-2, n + 1];
 end
 
 # Print error

@@ -6,9 +6,9 @@ using CSV
 using DataFrames
 using JSON
 
-include("Utils/InitialFunctions.jl")
-include("Utils/ExactSolutions.jl")
-include("Utils/Utils.jl")
+include("../../Utils/InitialFunctions.jl")
+include("../../Utils/ExactSolutions.jl")
+include("../../Utils/Utils.jl")
 
 ## Definition of basic parameters
 

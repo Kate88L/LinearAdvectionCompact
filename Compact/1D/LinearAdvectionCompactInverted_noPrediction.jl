@@ -7,8 +7,8 @@ using DataFrames
 using Statistics
 using ForwardDiff
 
-include("Utils/InitialFunctions.jl")
-include("Utils/ExactSolutions.jl")
+include("../../Utils/InitialFunctions.jl")
+include("../../Utils/ExactSolutions.jl")
 
 ## Definition of basic parameters
 

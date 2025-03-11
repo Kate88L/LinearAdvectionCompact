@@ -3,15 +3,15 @@
 using LinearAlgebra
 using PlotlyJS
 
-include("../Utils/InitialFunctions.jl")
+include("../../Utils/InitialFunctions.jl")
 
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 1;
 
 # Courant number
-c = 5;
+c = 3;
 d = c;
 
 # Grid settings - 2D regular grid
@@ -23,12 +23,12 @@ Nx = 100 * 2^level
 h = (x1R - x1L) / Nx
 
 # Velocity
-angle = 45 # angle in degrees
-U = [cosd(angle), sind(angle)]
+U = [1.0, 1.0]
 
 # Time
-tau = cosd(angle) * c * h / maximum(abs.(U))
+tau = sqrt(2) * c * h / maximum(abs.(U))
 Ntau = Int(Nx / 10)
+
 
 # Initial condition
 phi_0(x1, x2) = x1.^2 + x2.^2;
@@ -91,29 +91,25 @@ for n = 1:Ntau
     for i = 2:1:Nx + 1
     for j = 2:1:Nx + 1
 
-        A = c * ( U[1] - U[2] ) / 2;
-        B = c * ( -U[1] + U[2] ) / 2;
-        D = c * ( U[1] + U[2] ) / 2;
-
     # First order solution
-        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + A * phi_first_order[i-1, j, n + 1] + B * phi_first_order[i, j-1, n + 1] + D * phi_first_order[i-1, j-1, n + 1]  ) / ( 1 + A + B + D );
+        phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + sqrt(2) * c * phi_first_order[i - 1, j - 1, n + 1] ) / ( 1 + sqrt(2) * c);
         
     # Predictor
-        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + A * phi_predictor[i-1, j, n + 1] + B * phi_predictor[i, j-1, n + 1] + D * phi_predictor[i-1, j-1, n + 1]  ) / ( 1 + A + B + D );
+        phi_predictor[i, j, n + 1] = ( phi[i, j, n] + sqrt(2) * c * phi_predictor[i - 1, j - 1, n + 1] ) / ( 1 + sqrt(2) * c);
 
     # Corrector
         r_upwind_n = phi_old[i, j] - phi[i , j, n] + phi[i - 1, j - 1, n + 1] - phi[i - 1, j - 1, n];
         r_downwind_n = phi_predictor[i, j, n] - phi_predictor[i, j, n + 1] + phi_predictor_n2[i - 1, j - 1, n + 1] - phi_predictor[i - 1, j - 1, n + 1];
    
         # ENO parameter 
-        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 0 : p[i, j, n + 1] = 0;
+        abs(r_downwind_n) <= abs(r_upwind_n) ? p[i, j, n + 1] = 0 : p[i, j, n + 1] = 1;
 
     # Second order solution
-        phi[i, j, n + 1] = ( phi[i, j, n] + A * phi[i-1, j, n + 1] + B * phi[i, j-1, n + 1] + D * phi[i-1, j-1, n + 1] 
-                                          - 0.5 * ( ( 1 - p[i, j, n + 1] ) .* r_downwind_n + p[i, j, n + 1] .* r_upwind_n ) ) / ( 1 + A + B + D );
+        phi[i, j, n + 1] = ( phi[i, j, n] + sqrt(2) * c * phi[i - 1, j - 1, n + 1] 
+                                          - 0.5 * ( ( 1 - p[i, j, n + 1] ) .* r_downwind_n + p[i, j, n + 1] .* r_upwind_n ) ) / ( 1 + sqrt(2) * c );
         
     # Predictor for next time step
-        phi_predictor_n2[i, j, n + 1] = ( phi[i, j, n + 1]  + A * phi_predictor_n2[i-1, j, n + 1] + B * phi_predictor_n2[i, j-1, n + 1] + D * phi_predictor_n2[i-1, j-1, n + 1]  ) / ( 1 + A + B + D );
+        phi_predictor_n2[i, j, n + 1] = ( phi[i, j, n + 1] + sqrt(2) * c * phi_predictor_n2[i - 1, j - 1, n + 1] ) / ( 1 + sqrt(2) * c );
 
     end
     end
@@ -134,6 +130,6 @@ trace2 = contour(x = x1, y = x2, z = phi[:, :, end], name = "Compact", showscale
 trace3 = contour(x = x1, y = x2, z = phi_first_order[:, :, end], name = "First-order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1, line_dash="dash")
 layout = Layout(title = "Linear advection equation", xaxis_title = "x1", yaxis_title = "x2", zaxis_title = "phi", colorbar = false)
 
-plot_phi = plot([trace1, trace2, trace3], layout)
+plot_phi = plot([trace1, trace2], layout)
 
 # plot_error = plot(surface(x = x1, y = x2, z = abs.(phi[:, :, end] - phi_exact.(X1, X2, Ntau * tau))* h^2))

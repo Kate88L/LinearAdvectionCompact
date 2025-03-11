@@ -7,9 +7,9 @@ using QuadGK
 using Trapz
 using Interpolations
 
-include("../Utils/InitialFunctions.jl")
-include("../Utils/ExactSolutions.jl")
-include("../Utils/Solvers.jl")
+include("../../../Utils/InitialFunctions.jl")
+include("../../../Utils/ExactSolutions.jl")
+include("../../../Utils/Solvers.jl")
 
 # Definition of Numerical Hamiltonian based on Godunov's Flux
 function H_godunov(u, v, H)

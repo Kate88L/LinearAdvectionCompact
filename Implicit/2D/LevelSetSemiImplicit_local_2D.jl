@@ -7,9 +7,9 @@ using DataFrames
 using JSON
 using DataStructures
 
-include("../Utils/InitialFunctions.jl")
-include("../Utils/ExactSolutions.jl")
-include("../Utils/Utils.jl")
+include("../../Utils/InitialFunctions.jl")
+include("../../Utils/ExactSolutions.jl")
+include("../../Utils/Utils.jl")
 
 ## Definition of basic parameters
 

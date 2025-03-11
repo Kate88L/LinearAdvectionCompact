@@ -3,9 +3,9 @@ using Plots
 using Interpolations
 using Trapz
 
-include("../Utils/Solvers.jl")
-include("../Utils/InitialFunctions.jl")
-include("../Utils/ExactSolutions.jl")
+include("../../../Utils/Solvers.jl")
+include("../../../Utils/InitialFunctions.jl")
+include("../../../Utils/ExactSolutions.jl")
 
 
 # Define the range of integration and the number of points

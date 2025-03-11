@@ -97,9 +97,11 @@ for n = 2:Ntau + 1
                 x = A \ b  # Solves the system A * x = b
                 global ii = i
                 phi[i, n + 1] = x[2]
-            else
-                phi[i, n + 1] = ( phi1[i, n] + cp[i] * phi[i - 1, n + 1] - cm[i] * phi[i + 1, n + 1] ) / (1 + cp[i] - cm[i]);
+                phi1[i, n] = phi[i, n + 1]
+                continue
             end
+            
+            phi[i, n + 1] = ( phi1[i, n] + cp[i] * phi[i - 1, n + 1] - cm[i] * phi[i + 1, n + 1] ) / (1 + cp[i] - cm[i]);
             
             phi1[i, n] = phi[i, n + 1]
         end

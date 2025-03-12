@@ -14,10 +14,10 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 0;
 
 # Courant number
-C = 1;
+C = 10;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -56,18 +56,20 @@ cm = zeros(Nx+3)
 
 phi = zeros(Nx + 3, Ntau + 3);
 phi1 = zeros(Nx + 3, Ntau + 3);
+phi2 = zeros(Nx + 3, Ntau + 3);
+phi_first_order = zeros(Nx + 3, Ntau + 3);
 
 # Initial condition
 phi[:, 1] = phi_0.(x);
 phi[:, 2] = phi_exact.(x, tau);
 
-# Boundary conditions
-phi[1, :] = phi_exact.(x[1], t);
-phi[2, :] = phi_exact.(x[2], t);
+# Boundary conditions right side - inflow
 phi[end-1, :] = phi_exact.(x[end-1], t);
 phi[end, :] = phi_exact.(x[end], t);
 
 phi1 = copy(phi)
+phi2 = copy(phi)
+phi_first_order = copy(phi)
 
 # ENO parameters
 ω = zeros(Nx + 1);
@@ -78,8 +80,40 @@ sweep_cases = Dict(1 => (3:1:Nx+1), 2 => (Nx+1:-1:3))
 ii = 0
 
 @time begin
+
+# Precompute the predictors for the initial time 
+phi1[3:end-2, 3] = phi[3:end-2, 1] # initialize with previous time step
+phi2[3:end-2, 3] = phi[3:end-2, 2] # initialize with previous time step
+for sweep = 1:2
+    sw = sweep_cases[sweep]
+    # Set c plus and c minus
+    global cp = ifelse(sweep == 1, max.(c, 0), zeros(Nx+3))
+    global cm = ifelse(sweep == 2, min.(c, 0), zeros(Nx+3))
+    for i = sw
+        phi1[i, 2] = ( phi1[i, 2] + cp[i] * phi[i - 1, 2] - cm[i] * phi[i + 1, 2] ) / ( 1 + cp[i] - cm[i] );
+        phi1[i - 1, 3] = ( phi[i - 1, 2] + cp[i - 1] * phi2[i - 2, 3] ) / ( 1 + cp[i - 1] );
+        phi1[i + 1, 3] = ( phi[i + 1, 2] - cm[i + 1] * phi2[i + 2, 3] ) / ( 1 - cm[i + 1] );
+    
+        phi2[i, 3] = ( phi2[i, 3] - 1/2 * ( -phi1[i, 2] + phi[i , 1] ) 
+            + cp[i] * ( phi2[i - 1, 3] - 1/2 * ( -phi1[i - 1, 3] + phi2[i - 2, 3] ) )
+            - cm[i] * ( phi2[i + 1, 3] - 1/2 * ( -phi1[i + 1, 3] + phi2[i + 2, 3] ) ) ) / ( 1 + cp[i] - cm[i] );
+    end
+    # Outlfow boundary condition on the left side
+    phi1[2, 3] = 3 * phi1[3, 3] - 3 * phi1[4, 3] + phi1[5, 3]
+    phi1[1, 3] = 3 * phi1[2, 3] - 3 * phi1[3, 3] + phi1[4, 3]
+    phi2[2, 3] = 3 * phi2[3, 3] - 3 * phi2[4, 3] + phi2[5, 3]
+    phi2[1, 3] = 3 * phi2[2, 3] - 3 * phi2[3, 3] + phi2[4, 3]
+    phi1[2, 2] = 3 * phi1[3, 2] - 3 * phi1[4, 2] + phi1[5, 2]
+    phi1[1, 2] = 3 * phi1[2, 2] - 3 * phi1[3, 2] + phi1[4, 2]
+end
+
 # Time Loop
 for n = 2:Ntau + 1
+
+    # Initialize with previous time step
+    phi[3:end-2, n + 1] = phi[3:end-2, n]
+    phi1[3:end-2, n + 1] = phi1[3:end-2, n]
+    phi_first_order[3:end-2, n + 1] = phi_first_order[3:end-2, n]
 
     for sweep in 1:2
         sw = sweep_cases[sweep]
@@ -92,26 +126,50 @@ for n = 2:Ntau + 1
             # Check, if the velocity has changed the sign - rarefaction wave
             if (c[i] > 0 && c[i - 1] < 0 && sweep == 1)
                 # solve the subsistem 
-                A = [1 - c[i - 1] -c[i - 1]; -c[i] 1 + c[i]]
+                A = [1 - c[i - 1]  c[i - 1]; 
+                      -c[i]        1 + c[i]]
+           
                 b = [phi[i - 1, n]; phi[i, n]]
-                x = A \ b  # Solves the system A * x = b
+                local x = A \ b  # Solves the system A * x = b
                 global ii = i
+                phi[i - 1, n + 1] = x[1]
+                phi1[i, n + 1] = x[2]
                 phi[i, n + 1] = x[2]
-                phi1[i, n] = phi[i, n + 1]
+                b = [phi_first_order[i - 1, n]; phi_first_order[i, n]]
+                local x = A \ b  # Solves the system A * x = b
+                phi_first_order[i, n + 1] = x[2]
                 continue
             end
+            # skip already computed points in rearfaction wave in the second sweep
+            if (c[i] < 0 && c[i + 1] > 0 && sweep == 2)
+                continue
+            end
+
+            phi_first_order[i, n + 1] = ( phi_first_order[i, n + 1] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
             
-            phi[i, n + 1] = ( phi1[i, n] + cp[i] * phi[i - 1, n + 1] - cm[i] * phi[i + 1, n + 1] ) / (1 + cp[i] - cm[i]);
-            
-            phi1[i, n] = phi[i, n + 1]
+            phi1[i, n + 1] = ( phi1[i, n + 1] + cp[i] * phi[i - 1, n + 1] - cm[i] * phi[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
+
+            phi[i, n + 1] =  ( phi[i, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) * abs(sign(cp[i]-cm[i]))
+            + cp[i] * ( phi[i - 1, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i - 1, n + 1] - phi1[i - 1, n + 1] + phi[i - 2, n + 1]) )
+            - cm[i] * ( phi[i + 1, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i + 1, n + 1] - phi1[i + 1, n + 1] + phi[i + 2, n + 1]) ) ) / ( 1 + cp[i] - cm[i] );
         end
-        phi1[:, n + 1] = phi[:, n + 1]
+
+        # Outlfow boundary condition on the left side
+        phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
+        phi1[2, n + 1] = 3 * phi1[3, n + 1] - 3 * phi1[4, n + 1] + phi1[5, n + 1]
+        phi_first_order[2, n + 1] = 3 * phi_first_order[3, n + 1] - 3 * phi_first_order[4, n + 1] + phi_first_order[5, n + 1]
+
+        phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
+        phi1[1, n + 1] = 3 * phi1[2, n + 1] - 3 * phi1[3, n + 1] + phi1[4, n + 1]
+        phi_first_order[1, n + 1] = 3 * phi_first_order[2, n + 1] - 3 * phi_first_order[3, n + 1] + phi_first_order[4, n + 1]
     end
 end
 end
 # Print error
 Error_t_h = tau * h * sum(abs(phi[i, n] - phi_exact.(x[i], t[n])) for n in 2:Ntau+2 for i in 2:Nx+2)
 println("Error t*h: ", Error_t_h)
+Error_t_h_1 = tau * h * sum(abs(phi_first_order[i, n] - phi_exact.(x[i], t[n])) for n in 2:Ntau+2 for i in 2:Nx+2)
+println("Error t*h first order: ", Error_t_h_1)
 
 # Error near rearfaction wave
 println("Error near rearfaction wave: ", abs(phi[ii, end-1] - phi_exact.(x[ii], t[end-1])))
@@ -131,12 +189,12 @@ println("=============================")
 trace2 = scatter(x = x, y = phi_exact.(x[2:end-1], t[end-1]), mode = "lines", name = "Exact", line=attr(color="black", width=2) )
 trace1 = scatter(x = x, y = phi_0.(x[2:end-1]), mode = "lines", name = "Initial Condition", line=attr(color="black", width=1, dash = "dash") )
 trace3 = scatter(x = x, y = phi[2:end-1,end-1], mode = "lines", name = "Solution", line=attr(color="firebrick", width=2))
-# trace4 = scatter(x = x, y = phi_first_order[:,end-1], mode = "lines", name = "First order", line=attr(color="green", width=2))
+trace4 = scatter(x = x, y = phi_first_order[2:end-1,end-1], mode = "lines", name = "First order", line=attr(color="green", width=2))
 
 layout = Layout(plot_bgcolor="white", 
                 xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 
-plot_phi = plot([ trace2, trace3, trace1], layout)
+plot_phi = plot([ trace2, trace3, trace1, trace4], layout)
 
 plot_phi
 

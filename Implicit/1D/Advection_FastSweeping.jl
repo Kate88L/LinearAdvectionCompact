@@ -14,10 +14,10 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 6;
 
 # Courant number
-C = 10;
+C = 5;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -57,6 +57,7 @@ cm = zeros(Nx+3)
 phi = zeros(Nx + 3, Ntau + 3);
 phi1 = zeros(Nx + 3, Ntau + 3);
 phi2 = zeros(Nx + 3, Ntau + 3);
+phi_k = zeros(Nx + 3, Ntau + 3); # Sweep solution
 phi_first_order = zeros(Nx + 3, Ntau + 3);
 
 # Initial condition
@@ -70,6 +71,7 @@ phi[end, :] = phi_exact.(x[end], t);
 phi1 = copy(phi)
 phi2 = copy(phi)
 phi_first_order = copy(phi)
+phi_k = copy(phi)
 
 # ENO parameters
 ω = zeros(Nx + 1);
@@ -111,8 +113,9 @@ end
 for n = 2:Ntau + 1
 
     # Initialize with previous time step
-    phi[3:end-2, n + 1] = phi[3:end-2, n]
+    # phi[3:end-2, n + 1] = phi[3:end-2, n]
     phi1[3:end-2, n + 1] = phi1[3:end-2, n]
+    phi_k[3:end-2, n] = phi[3:end-2, n] 
     phi_first_order[3:end-2, n + 1] = phi_first_order[3:end-2, n]
 
     for sweep in 1:2
@@ -132,26 +135,29 @@ for n = 2:Ntau + 1
                 b = [phi[i - 1, n]; phi[i, n]]
                 local x = A \ b  # Solves the system A * x = b
                 global ii = i
-                phi[i - 1, n + 1] = x[1]
+                phi[i - 1, n + 1] = x[1] 
                 phi1[i, n + 1] = x[2]
                 phi[i, n + 1] = x[2]
+                phi_k[i, n] = x[2] # remember the solution in previous sweep
                 b = [phi_first_order[i - 1, n]; phi_first_order[i, n]]
                 local x = A \ b  # Solves the system A * x = b
                 phi_first_order[i, n + 1] = x[2]
                 continue
             end
             # skip already computed points in rearfaction wave in the second sweep
-            if (c[i] < 0 && c[i + 1] > 0 && sweep == 2)
-                continue
-            end
+            # if (c[i] < 0 && c[i + 1] > 0 && sweep == 2)
+            #     continue
+            # end
 
             phi_first_order[i, n + 1] = ( phi_first_order[i, n + 1] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
             
             phi1[i, n + 1] = ( phi1[i, n + 1] + cp[i] * phi[i - 1, n + 1] - cm[i] * phi[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
 
-            phi[i, n + 1] =  ( phi[i, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) * abs(sign(cp[i]-cm[i]))
+            phi[i, n + 1] =  ( phi_k[i, n] - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) * abs(sign(cp[i]-cm[i]))
             + cp[i] * ( phi[i - 1, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i - 1, n + 1] - phi1[i - 1, n + 1] + phi[i - 2, n + 1]) )
             - cm[i] * ( phi[i + 1, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i + 1, n + 1] - phi1[i + 1, n + 1] + phi[i + 2, n + 1]) ) ) / ( 1 + cp[i] - cm[i] );
+        
+            phi_k[i, n] = phi[i, n + 1]
         end
 
         # Outlfow boundary condition on the left side
@@ -162,6 +168,8 @@ for n = 2:Ntau + 1
         phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
         phi1[1, n + 1] = 3 * phi1[2, n + 1] - 3 * phi1[3, n + 1] + phi1[4, n + 1]
         phi_first_order[1, n + 1] = 3 * phi_first_order[2, n + 1] - 3 * phi_first_order[3, n + 1] + phi_first_order[4, n + 1]
+
+        phi_k[:, n + 1] = copy(phi[:, n + 1])
     end
 end
 end
@@ -172,7 +180,7 @@ Error_t_h_1 = tau * h * sum(abs(phi_first_order[i, n] - phi_exact.(x[i], t[n])) 
 println("Error t*h first order: ", Error_t_h_1)
 
 # Error near rearfaction wave
-println("Error near rearfaction wave: ", abs(phi[ii, end-1] - phi_exact.(x[ii], t[end-1])))
+# println("Error near rearfaction wave: ", abs(phi[ii, end-1] - phi_exact.(x[ii], t[end-1])))
 println("Max derivative: ", maximum(diff(phi[:, end-1]) / h))
 println("Min derivative: ", minimum(diff(phi[:, end-1]) / h))
 

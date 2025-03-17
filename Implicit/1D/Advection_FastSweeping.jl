@@ -31,9 +31,10 @@ h = (xR - xL) / Nx
 # phi_exact(x, t) = phi_0.(x - t);    
 
 # Variable velocity example
-u(x) = sin.(x - 0.5)
-phi_0(x) = sin.(x - 0.5);
-phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-0.5) ./ 2) ) )
+offset = 0.0
+u(x) = sin.(x - offset)
+phi_0(x) = sin.(x - offset);
+phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
 
 ## Comptutation
 
@@ -84,30 +85,30 @@ ii = 0
 @time begin
 
 # Precompute the predictors for the initial time 
-phi1[3:end-2, 3] = phi[3:end-2, 1] # initialize with previous time step
-phi2[3:end-2, 3] = phi[3:end-2, 2] # initialize with previous time step
-for sweep = 1:2
-    sw = sweep_cases[sweep]
-    # Set c plus and c minus
-    global cp = ifelse(sweep == 1, max.(c, 0), zeros(Nx+3))
-    global cm = ifelse(sweep == 2, min.(c, 0), zeros(Nx+3))
-    for i = sw
-        phi1[i, 2] = ( phi1[i, 2] + cp[i] * phi[i - 1, 2] - cm[i] * phi[i + 1, 2] ) / ( 1 + cp[i] - cm[i] );
-        phi1[i - 1, 3] = ( phi[i - 1, 2] + cp[i - 1] * phi2[i - 2, 3] ) / ( 1 + cp[i - 1] );
-        phi1[i + 1, 3] = ( phi[i + 1, 2] - cm[i + 1] * phi2[i + 2, 3] ) / ( 1 - cm[i + 1] );
+# phi1[3:end-2, 3] = phi[3:end-2, 1] # initialize with previous time step
+# phi2[3:end-2, 3] = phi[3:end-2, 2] # initialize with previous time step
+# for sweep = 1:2
+#     sw = sweep_cases[sweep]
+#     # Set c plus and c minus
+#     global cp = ifelse(sweep == 1, max.(c, 0), zeros(Nx+3))
+#     global cm = ifelse(sweep == 2, min.(c, 0), zeros(Nx+3))
+#     for i = sw
+#         phi1[i, 2] = ( phi1[i, 2] + cp[i] * phi[i - 1, 2] - cm[i] * phi[i + 1, 2] ) / ( 1 + cp[i] - cm[i] );
+#         phi1[i - 1, 3] = ( phi[i - 1, 2] + cp[i - 1] * phi2[i - 2, 3] ) / ( 1 + cp[i - 1] );
+#         phi1[i + 1, 3] = ( phi[i + 1, 2] - cm[i + 1] * phi2[i + 2, 3] ) / ( 1 - cm[i + 1] );
     
-        phi2[i, 3] = ( phi2[i, 3] - 1/2 * ( -phi1[i, 2] + phi[i , 1] ) 
-            + cp[i] * ( phi2[i - 1, 3] - 1/2 * ( -phi1[i - 1, 3] + phi2[i - 2, 3] ) )
-            - cm[i] * ( phi2[i + 1, 3] - 1/2 * ( -phi1[i + 1, 3] + phi2[i + 2, 3] ) ) ) / ( 1 + cp[i] - cm[i] );
-    end
-    # Outlfow boundary condition on the left side
-    phi1[2, 3] = 3 * phi1[3, 3] - 3 * phi1[4, 3] + phi1[5, 3]
-    phi1[1, 3] = 3 * phi1[2, 3] - 3 * phi1[3, 3] + phi1[4, 3]
-    phi2[2, 3] = 3 * phi2[3, 3] - 3 * phi2[4, 3] + phi2[5, 3]
-    phi2[1, 3] = 3 * phi2[2, 3] - 3 * phi2[3, 3] + phi2[4, 3]
-    phi1[2, 2] = 3 * phi1[3, 2] - 3 * phi1[4, 2] + phi1[5, 2]
-    phi1[1, 2] = 3 * phi1[2, 2] - 3 * phi1[3, 2] + phi1[4, 2]
-end
+#         phi2[i, 3] = ( phi2[i, 3] - 1/2 * ( -phi1[i, 2] + phi[i , 1] ) 
+#             + cp[i] * ( phi2[i - 1, 3] - 1/2 * ( -phi1[i - 1, 3] + phi2[i - 2, 3] ) )
+#             - cm[i] * ( phi2[i + 1, 3] - 1/2 * ( -phi1[i + 1, 3] + phi2[i + 2, 3] ) ) ) / ( 1 + cp[i] - cm[i] );
+#     end
+#     # Outlfow boundary condition on the left side
+#     phi1[2, 3] = 3 * phi1[3, 3] - 3 * phi1[4, 3] + phi1[5, 3]
+#     phi1[1, 3] = 3 * phi1[2, 3] - 3 * phi1[3, 3] + phi1[4, 3]
+#     phi2[2, 3] = 3 * phi2[3, 3] - 3 * phi2[4, 3] + phi2[5, 3]
+#     phi2[1, 3] = 3 * phi2[2, 3] - 3 * phi2[3, 3] + phi2[4, 3]
+#     phi1[2, 2] = 3 * phi1[3, 2] - 3 * phi1[4, 2] + phi1[5, 2]
+#     phi1[1, 2] = 3 * phi1[2, 2] - 3 * phi1[3, 2] + phi1[4, 2]
+# end
 
 # Time Loop
 for n = 2:Ntau + 1
@@ -145,9 +146,9 @@ for n = 2:Ntau + 1
                 continue
             end
             # skip already computed points in rearfaction wave in the second sweep
-            # if (c[i] < 0 && c[i + 1] > 0 && sweep == 2)
-            #     continue
-            # end
+            if (c[i] < 0 && c[i - 1] > 0 && sweep == 2)
+                continue
+            end
 
             phi_first_order[i, n + 1] = ( phi_first_order[i, n + 1] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
             

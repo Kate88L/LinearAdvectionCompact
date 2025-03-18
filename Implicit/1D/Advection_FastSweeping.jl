@@ -31,7 +31,7 @@ h = (xR - xL) / Nx
 # phi_exact(x, t) = phi_0.(x - t);    
 
 # Variable velocity example
-offset = 0.0
+offset = 0.5
 u(x) = sin.(x - offset)
 phi_0(x) = sin.(x - offset);
 phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
@@ -114,7 +114,6 @@ ii = 0
 for n = 2:Ntau + 1
 
     # Initialize with previous time step
-    # phi[3:end-2, n + 1] = phi[3:end-2, n]
     phi1[3:end-2, n + 1] = phi1[3:end-2, n]
     phi_k[3:end-2, n] = phi[3:end-2, n] 
     phi_first_order[3:end-2, n + 1] = phi_first_order[3:end-2, n]
@@ -146,9 +145,9 @@ for n = 2:Ntau + 1
                 continue
             end
             # skip already computed points in rearfaction wave in the second sweep
-            if (c[i] < 0 && c[i - 1] > 0 && sweep == 2)
-                continue
-            end
+            # if (c[i] < 0 && c[i + 1] > 0 && sweep == 2)
+            #     continue
+            # end
 
             phi_first_order[i, n + 1] = ( phi_first_order[i, n + 1] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
             

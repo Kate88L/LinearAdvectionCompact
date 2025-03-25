@@ -52,13 +52,14 @@ t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
 
 c = zeros(Nx+3) .+ u.(x) * tau / h
-cp = zeros(Nx+3)
-cm = zeros(Nx+3)
+
+# Set c plus and c minus
+cp = max.(c, 0)
+cm = min.(c, 0)
 
 phi = zeros(Nx + 3, Ntau + 3);
 phi1 = zeros(Nx + 3, Ntau + 3);
 phi2 = zeros(Nx + 3, Ntau + 3);
-phi_k = zeros(Nx + 3, Ntau + 3); # Sweep solution
 phi_first_order = zeros(Nx + 3, Ntau + 3);
 
 # Initial condition
@@ -72,7 +73,6 @@ phi[end, :] = phi_exact.(x[end], t);
 phi1 = copy(phi)
 phi2 = copy(phi)
 phi_first_order = copy(phi)
-phi_k = copy(phi)
 
 # ENO parameters
 ω = zeros(Nx + 1);
@@ -84,45 +84,12 @@ ii = 0
 
 @time begin
 
-# Precompute the predictors for the initial time 
-# phi1[3:end-2, 3] = phi[3:end-2, 1] # initialize with previous time step
-# phi2[3:end-2, 3] = phi[3:end-2, 2] # initialize with previous time step
-# for sweep = 1:2
-#     sw = sweep_cases[sweep]
-#     # Set c plus and c minus
-#     global cp = ifelse(sweep == 1, max.(c, 0), zeros(Nx+3))
-#     global cm = ifelse(sweep == 2, min.(c, 0), zeros(Nx+3))
-#     for i = sw
-#         phi1[i, 2] = ( phi1[i, 2] + cp[i] * phi[i - 1, 2] - cm[i] * phi[i + 1, 2] ) / ( 1 + cp[i] - cm[i] );
-#         phi1[i - 1, 3] = ( phi[i - 1, 2] + cp[i - 1] * phi2[i - 2, 3] ) / ( 1 + cp[i - 1] );
-#         phi1[i + 1, 3] = ( phi[i + 1, 2] - cm[i + 1] * phi2[i + 2, 3] ) / ( 1 - cm[i + 1] );
-    
-#         phi2[i, 3] = ( phi2[i, 3] - 1/2 * ( -phi1[i, 2] + phi[i , 1] ) 
-#             + cp[i] * ( phi2[i - 1, 3] - 1/2 * ( -phi1[i - 1, 3] + phi2[i - 2, 3] ) )
-#             - cm[i] * ( phi2[i + 1, 3] - 1/2 * ( -phi1[i + 1, 3] + phi2[i + 2, 3] ) ) ) / ( 1 + cp[i] - cm[i] );
-#     end
-#     # Outlfow boundary condition on the left side
-#     phi1[2, 3] = 3 * phi1[3, 3] - 3 * phi1[4, 3] + phi1[5, 3]
-#     phi1[1, 3] = 3 * phi1[2, 3] - 3 * phi1[3, 3] + phi1[4, 3]
-#     phi2[2, 3] = 3 * phi2[3, 3] - 3 * phi2[4, 3] + phi2[5, 3]
-#     phi2[1, 3] = 3 * phi2[2, 3] - 3 * phi2[3, 3] + phi2[4, 3]
-#     phi1[2, 2] = 3 * phi1[3, 2] - 3 * phi1[4, 2] + phi1[5, 2]
-#     phi1[1, 2] = 3 * phi1[2, 2] - 3 * phi1[3, 2] + phi1[4, 2]
-# end
-
 # Time Loop
 for n = 2:Ntau + 1
 
-    # Initialize with previous time step
-    phi1[3:end-2, n + 1] = phi1[3:end-2, n]
-    phi_k[3:end-2, n] = phi[3:end-2, n] 
-    phi_first_order[3:end-2, n + 1] = phi_first_order[3:end-2, n]
-
+    for k = 1:1
     for sweep in 1:2
         sw = sweep_cases[sweep]
-        # Set c plus and c minus
-        global cp = ifelse(sweep == 1, max.(c, 0), zeros(Nx+3))
-        global cm = ifelse(sweep == 2, min.(c, 0), zeros(Nx+3))
 
         for i = sw
 
@@ -138,26 +105,20 @@ for n = 2:Ntau + 1
                 phi[i - 1, n + 1] = x[1] 
                 phi1[i, n + 1] = x[2]
                 phi[i, n + 1] = x[2]
-                phi_k[i, n] = x[2] # remember the solution in previous sweep
                 b = [phi_first_order[i - 1, n]; phi_first_order[i, n]]
                 local x = A \ b  # Solves the system A * x = b
                 phi_first_order[i, n + 1] = x[2]
                 continue
             end
-            # skip already computed points in rearfaction wave in the second sweep
-            # if (c[i] < 0 && c[i + 1] > 0 && sweep == 2)
-            #     continue
-            # end
 
-            phi_first_order[i, n + 1] = ( phi_first_order[i, n + 1] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
+            phi_first_order[i, n + 1] = ( phi_first_order[i, n] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
             
-            phi1[i, n + 1] = ( phi1[i, n + 1] + cp[i] * phi[i - 1, n + 1] - cm[i] * phi[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
+            phi1[i, n + 1] = ( phi1[i, n] + cp[i] * phi[i - 1, n + 1] - cm[i] * phi[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
 
-            phi[i, n + 1] =  ( phi_k[i, n] - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) * abs(sign(cp[i]-cm[i]))
+            phi[i, n + 1] =  ( phi[i, n] - 1 / 2 * ( phi1[i, n + 1] - phi[i, n] - phi1[i, n] + phi[i, n - 1] ) * abs(sign(cp[i]-cm[i]))
             + cp[i] * ( phi[i - 1, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i - 1, n + 1] - phi1[i - 1, n + 1] + phi[i - 2, n + 1]) )
             - cm[i] * ( phi[i + 1, n + 1] - 1 / 2 * ( phi1[i, n + 1] - phi[i + 1, n + 1] - phi1[i + 1, n + 1] + phi[i + 2, n + 1]) ) ) / ( 1 + cp[i] - cm[i] );
         
-            phi_k[i, n] = phi[i, n + 1]
         end
 
         # Outlfow boundary condition on the left side
@@ -168,8 +129,7 @@ for n = 2:Ntau + 1
         phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
         phi1[1, n + 1] = 3 * phi1[2, n + 1] - 3 * phi1[3, n + 1] + phi1[4, n + 1]
         phi_first_order[1, n + 1] = 3 * phi_first_order[2, n + 1] - 3 * phi_first_order[3, n + 1] + phi_first_order[4, n + 1]
-
-        phi_k[:, n + 1] = copy(phi[:, n + 1])
+    end
     end
 end
 end

@@ -14,7 +14,7 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 3;
 
 # Courant number
 C = 5;
@@ -54,22 +54,22 @@ T = 1.2
 tau = C * h / maximum(max(abs.(u.(x, y)), abs.(v.(x, y))))
 Ntau = Int(round(T / tau))
 
-Ntau = 1
+# Ntau = 1
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
 c = zeros(N+3, N+3) .+ u.(x, y)' * tau / h
-d = zeros(N+3, N+3) .+ v.(x, y) * tau / h
+d = zeros(N+3, N+3) .+ v.(x, y)' * tau / h
 
-cp = zeros(N+3, N+3)
-cm = zeros(N+3, N+3)
-dp = zeros(N+3, N+3)
-dm = zeros(N+3, N+3)
+# Set c plus and c minus
+cp = max.(c, 0)
+cm = min.(c, 0)
+dp = max.(d, 0)
+dm = min.(d, 0)
 
 phi = zeros(N + 3, N + 3, Ntau + 3);
 phi1 = zeros(N + 3, N + 3, Ntau + 3);
 phi2 = zeros(N + 3, N + 3, Ntau + 3);
-phi_k = zeros(N + 3, N + 3, Ntau + 3); # Sweep solution
 phi_first_order = zeros(N + 3, N + 3, Ntau + 3);
 
 # Initial condition
@@ -89,7 +89,6 @@ end
 phi1 = copy(phi)
 phi2 = copy(phi)
 phi_first_order = copy(phi)
-phi_k = copy(phi)
 
 # Fast sweeping
 sweep_cases = Dict(
@@ -104,28 +103,41 @@ sweep_cases = Dict(
 # Time Loop
 for n = 2:Ntau + 1
 
-    # Initialize with previous time step
-    phi_first_order[3:end-2, 3:end-2, n + 1] = phi_first_order[3:end-2, 3:end-2, n]
-
-    for sweep in 1:1
+    for k = 1:1
+    for sweep in 1:4
         swI, swJ = sweep_cases[sweep]
-        # Set c plus and c minus
-        global cp = ifelse(sweep < 3, max.(c, 0), zeros(N+3, N+3))
-        global cm = ifelse(sweep > 2, min.(c, 0), zeros(N+3, N+3))
-        global dp = ifelse(sweep % 2 == 1, max.(d, 0), zeros(N+3, N+3))
-        global dm = ifelse(sweep % 2 == 0, min.(d, 0), zeros(N+3, N+3))
-
-        println(dp)
-
 
         for i = swI
         for j = swJ
 
-            phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n + 1] + cp[i, j] * phi_first_order[i - 1, j, n + 1] 
+            # if (d[i, j] > 0 && d[i, j - 1] < 0 && sweep == 1)
+            #     # Solve the subsistem
+            #     A = [1  + c[i, j - 1] - d[i, j - 1]  d[i, j - 1]; 
+            #           -d[i, j]        1 + c[i, j] + d[i, j] ]
+            #     b = [phi[i, j - 1, n] + c[i, j - 1] * phi[i - 1, j - 1, n + 1]; phi[i, j, n] + c[i, j] * phi[i - 1, j, n + 1]]
+            #     x = A \ b  # Solves the system A * x = b
+            #     phi[i, j - 1, n + 1] = x[1]
+            #     phi1[i, j - 1, n + 1] = x[2]
+            #     phi1[i, j, n + 1] = x[2]
+            #     phi[i, j, n + 1] = x[2]
+            #     continue
+            # end
+
+            phi_first_order[i, j, n + 1] = ( phi_first_order[i, j, n] + cp[i, j] * phi_first_order[i - 1, j, n + 1] 
                                                                       + dp[i, j] * phi_first_order[i, j - 1, n + 1] 
                                                                       - cm[i, j] * phi_first_order[i + 1, j, n + 1]
                                                                       - dm[i, j] * phi_first_order[i, j + 1, n + 1] ) / ( 1 + cp[i, j] + dp[i, j] - cm[i, j] - dm[i, j] );
+            phi1[i, j, n + 1] = ( phi1[i, j, n] + cp[i, j] * phi[i - 1, j, n + 1] 
+                                              + dp[i, j] * phi[i, j - 1, n + 1] 
+                                              - cm[i, j] * phi[i + 1, j, n + 1]
+                                              - dm[i, j] * phi[i, j + 1, n + 1] ) / ( 1 + cp[i, j] + dp[i, j] - cm[i, j] - dm[i, j] );
 
+            phi[i, j, n + 1] = ( phi[i, j, n] - 0.5 * ( phi1[i, j, n + 1] - phi[i, j, n] - phi1[i, j, n] + phi[i, j, n - 1] ) 
+                                + cp[i, j] * ( phi[i - 1, j, n + 1] - 0.5 * ( phi1[i, j, n + 1] - phi[i - 1, j, n + 1] - phi1[i - 1, j, n + 1] + phi[i - 2, j, n + 1] ) )
+                                - cm[i, j] * ( phi[i + 1, j, n + 1] - 0.5 * ( phi1[i, j, n + 1] - phi[i + 1, j, n + 1] - phi1[i + 1, j, n + 1] + phi[i + 2, j, n + 1] ) )
+                                + dp[i, j] * ( phi[i, j - 1, n + 1] - 0.5 * ( phi1[i, j, n + 1] - phi[i, j - 1, n + 1] - phi1[i, j - 1, n + 1] + phi[i, j - 2, n + 1] ) )
+                                - dm[i, j] * ( phi[i, j + 1, n + 1] - 0.5 * ( phi1[i, j, n + 1] - phi[i, j + 1, n + 1] - phi1[i, j + 1, n + 1] + phi[i, j + 2, n + 1] ) ) ) / ( 1 + cp[i, j] + dp[i, j] - cm[i, j] - dm[i, j] );
+                            
 
         end
         end
@@ -133,8 +145,27 @@ for n = 2:Ntau + 1
         # Outlfow boundary condition on the left side
         phi_first_order[:, 2, n + 1] = 3 * phi_first_order[:, 3, n + 1] - 3 * phi_first_order[:, 4, n + 1] + phi_first_order[:, 5, n + 1]
         phi_first_order[:, 1, n + 1] = 3 * phi_first_order[:, 2, n + 1] - 3 * phi_first_order[:, 3, n + 1] + phi_first_order[:, 4, n + 1]
+        phi1[:, 2, n + 1] = 3 * phi1[:, 3, n + 1] - 3 * phi1[:, 4, n + 1] + phi1[:, 5, n + 1]
+        phi1[:, 1, n + 1] = 3 * phi1[:, 2, n + 1] - 3 * phi1[:, 3, n + 1] + phi1[:, 4, n + 1]
+        phi[:, 2, n + 1] = 3 * phi[:, 3, n + 1] - 3 * phi[:, 4, n + 1] + phi[:, 5, n + 1]
+        phi[:, 1, n + 1] = 3 * phi[:, 2, n + 1] - 3 * phi[:, 3, n + 1] + phi[:, 4, n + 1]
 
+        # Outlfow boundary condition on x boundary
+        phi_first_order[2, :, n + 1] = 3 * phi_first_order[3, :, n + 1] - 3 * phi_first_order[4, :, n + 1] + phi_first_order[5, :, n + 1]
+        phi_first_order[1, :, n + 1] = 3 * phi_first_order[2, :, n + 1] - 3 * phi_first_order[3, :, n + 1] + phi_first_order[4, :, n + 1]
+        phi1[2, :, n + 1] = 3 * phi1[3, :, n + 1] - 3 * phi1[4, :, n + 1] + phi1[5, :, n + 1]
+        phi1[1, :, n + 1] = 3 * phi1[2, :, n + 1] - 3 * phi1[3, :, n + 1] + phi1[4, :, n + 1]
+        phi[2, :, n + 1] = 3 * phi[3, :, n + 1] - 3 * phi[4, :, n + 1] + phi[5, :, n + 1]
+        phi[1, :, n + 1] = 3 * phi[2, :, n + 1] - 3 * phi[3, :, n + 1] + phi[4, :, n + 1]
+
+        phi_first_order[end-1, :, n + 1] = 3 * phi_first_order[end-2, :, n + 1] - 3 * phi_first_order[end-3, :, n + 1] + phi_first_order[end-4, :, n + 1]
+        phi_first_order[end, :, n + 1] = 3 * phi_first_order[end-1, :, n + 1] - 3 * phi_first_order[end-2, :, n + 1] + phi_first_order[end-3, :, n + 1]
+        phi1[end-1, :, n + 1] = 3 * phi1[end-2, :, n + 1] - 3 * phi1[end-3, :, n + 1] + phi1[end-4, :, n + 1]
+        phi1[end, :, n + 1] = 3 * phi1[end-1, :, n + 1] - 3 * phi1[end-2, :, n + 1] + phi1[end-3, :, n + 1]
+        phi[end-1, :, n + 1] = 3 * phi[end-2, :, n + 1] - 3 * phi[end-3, :, n + 1] + phi[end-4, :, n + 1]
+        phi[end, :, n + 1] = 3 * phi[end-1, :, n + 1] - 3 * phi[end-2, :, n + 1] + phi[end-3, :, n + 1]
     end
+end
 end
 end
 
@@ -173,25 +204,41 @@ println("minimum derivative y: ", minimum(d_phi_y))
 println("maximum derivative y: ", maximum(d_phi_y))
 
 # Plot of the result at the final time together with the exact solution
-trace3 = surface(x = x, y = y, z = phi_exact.(X, Y, t[end - 1])', mode = "lines", name = "Exact", showscale=false, contours_coloring="lines", colorscale="Greys", line_width=2)
-trace0 = contour(x = x, y = y, z = phi_0.(X, Y)', mode = "lines", name = "Initial Condition", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1 )
-trace2 = contour(x = x, y = y, z = phi[:, :, end - 1]', mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
-trace1 = surface(x = x, y = y, z = phi_first_order[:, :, end - 1]', mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_dash="dash", line_width=1)
+trace3 = surface(x = x, y = y, z = phi_exact.(X, Y, t[end - 1]), 
+                 mode = "lines", name = "Exact Solution", 
+                 showscale=false, contours_coloring="lines", 
+                 colorscale="Greys", line_width=3, opacity=1.0)
+
+trace0 = surface(x = x, y = y, z = phi_0.(X, Y), 
+                 mode = "lines", name = "Initial Condition", 
+                 showscale=false, colorscale = "Greys", 
+                 contours_coloring="lines", line_width=2, opacity=0.36)
+
+trace2 = surface(x = x, y = y, z = phi[:, :, end - 1], 
+                 mode = "lines", name = "First Order (Method A)", 
+                 showscale=false, colorscale = "Reds", 
+                 contours_coloring="lines", line_width=2, opacity=1.0)
+
+trace1 = surface(x = x, y = y, z = phi_first_order[:, :, end - 1], 
+                 mode = "lines", name = "First Order (Method B)", 
+                 showscale=false, colorscale = "Reds", 
+                 contours_coloring="lines", line_width=2, opacity=0.5)
 
 layout = Layout(plot_bgcolor="white", 
-                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
+                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), 
+                yaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)))
 
-plot_phi = plot([ trace3, trace1 ], layout)
-
+plot_phi = plot([trace3, trace0, trace1, trace2], layout)
 plot_phi
+
 
 # For plot purposes replace values that are delta far way from 1 and -1 by 0
 # d_phi_x = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_x)
 # d_phi_y = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_y)
 
 # Plot derivative
-trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
-trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :], name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
 
 plot_phi_d_x = plot([trace1_d_x])
 plot_phi_d_y = plot([trace1_d_y])

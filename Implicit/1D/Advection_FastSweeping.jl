@@ -14,7 +14,7 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 6;
+level = 0;
 
 # Courant number
 C = 5;

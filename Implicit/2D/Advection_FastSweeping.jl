@@ -13,12 +13,12 @@ include("../../Utils/Utils.jl")
 
 ## Definition of basic parameters
 
-third_order = true;
+third_order = false;
 
 K = 1
 
 # Level of refinement
-level = 1;
+level = 2;
 
 # Courant number
 C = 5;
@@ -39,10 +39,10 @@ h = (xR - xL) / N
 
 # Variable velocity example
 offset = 0.5
-u(x, y) = 0.0
-v(x, y) = sin.(y - offset)
-phi_0(x, y) = sin.(y - offset);
-phi_exact(x, y, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (y-offset) ./ 2) ) )
+u(x, y) = sin.(x - offset)
+v(x, y) = 0*sin.(y - offset) + 1
+phi_0(x, y) = sin.(x - offset) + 0*sin.(y - offset);
+phi_exact(x, y, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) ) +0* sin.( 2 * atan.( exp.(-t) .* tan.( (y-offset) ./ 2) ) )
 
 ## Comptutation
 
@@ -62,7 +62,7 @@ Ntau = Int(round(T / tau))
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
-c = zeros(N+3, N+3) .+ u.(x, y)' * tau / h
+c = zeros(N+3, N+3) .+ u.(x, y) * tau / h
 d = zeros(N+3, N+3) .+ v.(x, y)' * tau / h
 
 # Set c plus and c minus
@@ -82,12 +82,14 @@ phi[:, :, 2] = phi_exact.(X, Y, tau);
 
 # Boundary conditions right side - inflow
 for n = 3:Ntau + 3
-    # phi[end-1, :, n] = phi_exact.(x[end-1], y, t[n]);
-    # phi[end, :, n] = phi_exact.(x[end], y, t[n]);
-    phi[:, end-1, n] = phi_exact.(x, y[end-1], t[n]);
-    phi[:, end, n] = phi_exact.(x, y[end], t[n]);
+    phi[end-1, :, n] = phi_exact.(x[end-1], y, t[n]);
+    phi[end, :, n] = phi_exact.(x[end], y, t[n]);
+    # phi[:, end-1, n] = phi_exact.(x, y[end-1], t[n]);
+    # phi[:, end, n] = phi_exact.(x, y[end], t[n]);
     # phi[1, :, n] = phi_exact.(x[1], y, t[n]);
     # phi[2, :, n] = phi_exact.(x[2], y, t[n]);
+    phi[:, 1, n] = phi_exact.(x, y[1], t[n]);
+    phi[:, 2, n] = phi_exact.(x, y[2], t[n]);
 end
 
 phi1 = copy(phi)
@@ -163,7 +165,8 @@ end
 for n = 2:Ntau + 1
 
     phi2_old_ = copy(phi2[:, :, n + 1]);
-
+ 
+    for kk = 1:1
     for sweep in 1:4
         swI, swJ = sweep_cases[sweep]
         swI_m, swJ_m = sweep_cases_mask[sweep]
@@ -355,12 +358,20 @@ for n = 2:Ntau + 1
         end
 
         # Outlfow boundary condition on the left side
-        phi_first_order[:, 2, n + 1] = 3 * phi_first_order[:, 3, n + 1] - 3 * phi_first_order[:, 4, n + 1] + phi_first_order[:, 5, n + 1]
-        phi_first_order[:, 1, n + 1] = 3 * phi_first_order[:, 2, n + 1] - 3 * phi_first_order[:, 3, n + 1] + phi_first_order[:, 4, n + 1]
-        phi1[:, 2, n + 1] = 3 * phi1[:, 3, n + 1] - 3 * phi1[:, 4, n + 1] + phi1[:, 5, n + 1]
-        phi1[:, 1, n + 1] = 3 * phi1[:, 2, n + 1] - 3 * phi1[:, 3, n + 1] + phi1[:, 4, n + 1]
-        phi[:, 2, n + 1] = 3 * phi[:, 3, n + 1] - 3 * phi[:, 4, n + 1] + phi[:, 5, n + 1]
-        phi[:, 1, n + 1] = 3 * phi[:, 2, n + 1] - 3 * phi[:, 3, n + 1] + phi[:, 4, n + 1]
+        # phi_first_order[:, 2, n + 1] = 3 * phi_first_order[:, 3, n + 1] - 3 * phi_first_order[:, 4, n + 1] + phi_first_order[:, 5, n + 1]
+        # phi_first_order[:, 1, n + 1] = 3 * phi_first_order[:, 2, n + 1] - 3 * phi_first_order[:, 3, n + 1] + phi_first_order[:, 4, n + 1]
+        # phi1[:, 2, n + 1] = 3 * phi1[:, 3, n + 1] - 3 * phi1[:, 4, n + 1] + phi1[:, 5, n + 1]
+        # phi1[:, 1, n + 1] = 3 * phi1[:, 2, n + 1] - 3 * phi1[:, 3, n + 1] + phi1[:, 4, n + 1]
+        # phi[:, 2, n + 1] = 3 * phi[:, 3, n + 1] - 3 * phi[:, 4, n + 1] + phi[:, 5, n + 1]
+        # phi[:, 1, n + 1] = 3 * phi[:, 2, n + 1] - 3 * phi[:, 3, n + 1] + phi[:, 4, n + 1]
+
+        # Outlfow boundary condition on the right side
+        phi_first_order[:, end - 1, n + 1] = 3 * phi_first_order[:, end - 2, n + 1] - 3 * phi_first_order[:, end - 3, n + 1] + phi_first_order[:, end - 4, n + 1]
+        phi_first_order[:, end, n + 1] = 3 * phi_first_order[:, end - 1, n + 1] - 3 * phi_first_order[:, end - 2, n + 1] + phi_first_order[:, end - 3, n + 1]
+        phi1[:, end - 1, n + 1] = 3 * phi1[:, end - 2, n + 1] - 3 * phi1[:, end - 3, n + 1] + phi1[:, end - 4, n + 1]
+        phi1[:, end, n + 1] = 3 * phi1[:, end - 1, n + 1] - 3 * phi1[:, end - 2, n + 1] + phi1[:, end - 3, n + 1]
+        phi[:, end - 1, n + 1] = 3 * phi[:, end - 2, n + 1] - 3 * phi[:, end - 3, n + 1] + phi[:, end - 4, n + 1]
+        phi[:, end, n + 1] = 3 * phi[:, end - 1, n + 1] - 3 * phi[:, end - 2, n + 1] + phi[:, end - 3, n + 1]
 
         # Outlfow boundary condition on x boundary
         phi_first_order[2, :, n + 1] = 3 * phi_first_order[3, :, n + 1] - 3 * phi_first_order[4, :, n + 1] + phi_first_order[5, :, n + 1]
@@ -370,13 +381,14 @@ for n = 2:Ntau + 1
         phi[2, :, n + 1] = 3 * phi[3, :, n + 1] - 3 * phi[4, :, n + 1] + phi[5, :, n + 1]
         phi[1, :, n + 1] = 3 * phi[2, :, n + 1] - 3 * phi[3, :, n + 1] + phi[4, :, n + 1]
 
-        phi_first_order[end-1, :, n + 1] = 3 * phi_first_order[end-2, :, n + 1] - 3 * phi_first_order[end-3, :, n + 1] + phi_first_order[end-4, :, n + 1]
-        phi_first_order[end, :, n + 1] = 3 * phi_first_order[end-1, :, n + 1] - 3 * phi_first_order[end-2, :, n + 1] + phi_first_order[end-3, :, n + 1]
-        phi1[end-1, :, n + 1] = 3 * phi1[end-2, :, n + 1] - 3 * phi1[end-3, :, n + 1] + phi1[end-4, :, n + 1]
-        phi1[end, :, n + 1] = 3 * phi1[end-1, :, n + 1] - 3 * phi1[end-2, :, n + 1] + phi1[end-3, :, n + 1]
-        phi[end-1, :, n + 1] = 3 * phi[end-2, :, n + 1] - 3 * phi[end-3, :, n + 1] + phi[end-4, :, n + 1]
-        phi[end, :, n + 1] = 3 * phi[end-1, :, n + 1] - 3 * phi[end-2, :, n + 1] + phi[end-3, :, n + 1]
+        # phi_first_order[end-1, :, n + 1] = 3 * phi_first_order[end-2, :, n + 1] - 3 * phi_first_order[end-3, :, n + 1] + phi_first_order[end-4, :, n + 1]
+        # phi_first_order[end, :, n + 1] = 3 * phi_first_order[end-1, :, n + 1] - 3 * phi_first_order[end-2, :, n + 1] + phi_first_order[end-3, :, n + 1]
+        # phi1[end-1, :, n + 1] = 3 * phi1[end-2, :, n + 1] - 3 * phi1[end-3, :, n + 1] + phi1[end-4, :, n + 1]
+        # phi1[end, :, n + 1] = 3 * phi1[end-1, :, n + 1] - 3 * phi1[end-2, :, n + 1] + phi1[end-3, :, n + 1]
+        # phi[end-1, :, n + 1] = 3 * phi[end-2, :, n + 1] - 3 * phi[end-3, :, n + 1] + phi[end-4, :, n + 1]
+        # phi[end, :, n + 1] = 3 * phi[end-1, :, n + 1] - 3 * phi[end-2, :, n + 1] + phi[end-3, :, n + 1]
     end
+end
 end
 end
 

@@ -29,15 +29,15 @@ Nx = 40 * 2^level
 h = (xR - xL) / Nx
 
 # Constant velocity example
-u(x) = 1.0
-phi_0(x) = cos.(x);
-phi_exact(x, t) = phi_0.(x - u.(x) * t);    
+# u(x) = -1.0
+# phi_0(x) = cos.(x);
+# phi_exact(x, t) = phi_0.(x - u.(x) * t);    
 
 # Variable velocity example
-# offset = 0.5
-# u(x) = sin.(x - offset)
-# phi_0(x) = sin.(x - offset);
-# phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
+offset = 0.5
+u(x) = sin.(x - offset)
+phi_0(x) = sin.(x - offset);
+phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
 
 ## Comptutation
 
@@ -69,8 +69,11 @@ phi[:, 1] = phi_0.(x);
 phi[:, 2] = phi_exact.(x, tau);
 
 # Boundary conditions - inflow
-phi[1, :] = phi_exact.(x[1], t);
-phi[2, :] = phi_exact.(x[2], t);
+phi[end, :] = phi_exact.(x[end], t);
+phi[end-1, :] = phi_exact.(x[end-1], t);
+
+# phi[2, :] = phi_exact.(x[2], t);
+# phi[1, :] = phi_exact.(x[1], t);
 
 phi_p = copy(phi)
 phi_first_order = copy(phi)
@@ -96,29 +99,44 @@ for n = 2:Ntau + 1
             phi_first_order[i, n + 1] = ( phi_first_order[i, n] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
             
             # First step of BDF - predictor at time n + 1
-            phi_p[i, n + 1] = ( phi[i, n] + c[i] * ( phi_p[i - 1, n + 1] - 0.5 * ( - 2 * phi_p[i - 1, n + 1] + phi_p[i - 2, n + 1] ) )  ) / ( 1 + 1.5 * c[i] );
+            phi_p[i, n + 1] = ( phi[i, n] + cp[i] * ( phi_p[i - 1, n + 1] - 0.5 * ( - 2 * phi_p[i - 1, n + 1] + phi_p[i - 2, n + 1] ) ) -  
+                                            cm[i] * ( phi_p[i + 1, n + 1] - 0.5 * ( - 2 * phi_p[i + 1, n + 1] + phi_p[i + 2, n + 1] ) ) ) / ( 1 + 1.5 * cp[i] - 1.5 * cm[i] );
 
             # Second step of BDF - predictor at time n + 2
-            phi_p[i, n + 2] = ( phi_p[i, n + 1] + c[i] * ( phi_p[i - 1, n + 2] - 0.5 * ( - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2]  ) ) ) / ( 1 + 1.5 * c[i] );
+            phi_p[i, n + 2] = ( phi_p[i, n + 1] + cp[i] * ( phi_p[i - 1, n + 2] - 0.5 * ( - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2]  ) ) -
+                                                  cm[i] * ( phi_p[i + 1, n + 2] - 0.5 * ( - 2 * phi_p[i + 1, n + 2] + phi_p[i + 2, n + 2]  ) ) ) / ( 1 + 1.5 * cp[i] - 1.5 * cm[i] );
 
-            der_x =  c[i] * ( phi_p[i, n + 2] - phi_p[i - 1, n + 2] ) + 0.5 * c[i] * ( phi_p[i, n + 2] - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] );
+            der_x = ( cp[i] * ( ( phi_p[i, n + 2] - phi_p[i - 1, n + 2] ) + 0.5 * ( phi_p[i, n + 2] - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] ) ) -
+                      cm[i] * ( ( phi_p[i, n + 2] - phi_p[i + 1, n + 2] ) + 0.5 * ( phi_p[i, n + 2] - 2 * phi_p[i + 1, n + 2] + phi_p[i + 2, n + 2] ) ) );
             # Final step of the extended BDF scheme
-            phi[i, n + 1] = ( phi[i, n] + 1/2 * der_x + 3/2 * c[i] * ( phi[i - 1, n + 1] - 0.5 * ( - 2 * phi[i - 1, n + 1] + phi[i - 2, n + 1]  ) ) ) / ( 1 + 3/2 * 1.5 * c[i] );
+            phi[i, n + 1] = ( phi[i, n] + 1/2 * der_x + 3/2 * cp[i] * ( phi[i - 1, n + 1] - 0.5 * ( - 2 * phi[i - 1, n + 1] + phi[i - 2, n + 1]  ) ) -
+                                                        3/2 * cm[i] * ( phi[i + 1, n + 1] - 0.5 * ( - 2 * phi[i + 1, n + 1] + phi[i + 2, n + 1]  ) ) ) / ( 1 + 3/2 * 1.5 * cp[i] - 3/2 * 1.5 * cm[i] );
 
         end
 
-        # Outlfow boundary condition on the right
+        # Outlfow boundary condition 
+        phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
+        phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
 
-        phi_p[end - 1, n + 1] = 3 * phi_p[end - 2, n + 1] - 3 * phi_p[end - 3, n + 1] + phi_p[end - 4, n + 1]
-        phi_first_order[end - 1, n + 1] = 3 * phi_first_order[end - 2, n + 1] - 3 * phi_first_order[end - 3, n + 1] + phi_first_order[end - 4, n + 1]
-        phi_p[end, n + 1] = 3 * phi_p[end - 1, n + 1] - 3 * phi_p[end - 2, n + 1] + phi_p[end - 3, n + 1]
-        phi_first_order[end, n + 1] = 3 * phi_first_order[end - 1, n + 1] - 3 * phi_first_order[end - 2, n + 1] + phi_first_order[end - 3, n + 1]
+        phi_first_order[2, n + 1] = 3 * phi_first_order[3, n + 1] - 3 * phi_first_order[4, n + 1] + phi_first_order[5, n + 1]
+        phi_first_order[1, n + 1] = 3 * phi_first_order[2, n + 1] - 3 * phi_first_order[3, n + 1] + phi_first_order[4, n + 1]
 
-        phi_p[end - 1, n + 2] = 3 * phi_p[end - 2, n + 2] - 3 * phi_p[end - 3, n + 2] + phi_p[end - 4, n + 2]
-        phi_p[end, n + 2] = 3 * phi_p[end - 1, n + 2] - 3 * phi_p[end - 2, n + 2] + phi_p[end - 3, n + 2]
+        phi_p[2, n + 1] = 3 * phi_p[3, n + 1] - 3 * phi_p[4, n + 1] + phi_p[5, n + 1]
+        phi_p[1, n + 1] = 3 * phi_p[2, n + 1] - 3 * phi_p[3, n + 1] + phi_p[4, n + 1]
 
-        phi[end - 1, n + 1] = 3 * phi[end - 2, n + 1] - 3 * phi[end - 3, n + 1] + phi[end - 4, n + 1]
-        phi[end, n + 1] = 3 * phi[end - 1, n + 1] - 3 * phi[end - 2, n + 1] + phi[end - 3, n + 1]
+        phi_p[2, n + 2] = 3 * phi_p[3, n + 2] - 3 * phi_p[4, n + 2] + phi_p[5, n + 2]
+        phi_p[1, n + 2] = 3 * phi_p[2, n + 2] - 3 * phi_p[3, n + 2] + phi_p[4, n + 2]
+
+        # phi_p[end - 1, n + 1] = 3 * phi_p[end - 2, n + 1] - 3 * phi_p[end - 3, n + 1] + phi_p[end - 4, n + 1]
+        # phi_first_order[end - 1, n + 1] = 3 * phi_first_order[end - 2, n + 1] - 3 * phi_first_order[end - 3, n + 1] + phi_first_order[end - 4, n + 1]
+        # phi_p[end, n + 1] = 3 * phi_p[end - 1, n + 1] - 3 * phi_p[end - 2, n + 1] + phi_p[end - 3, n + 1]
+        # phi_first_order[end, n + 1] = 3 * phi_first_order[end - 1, n + 1] - 3 * phi_first_order[end - 2, n + 1] + phi_first_order[end - 3, n + 1]
+
+        # phi_p[end - 1, n + 2] = 3 * phi_p[end - 2, n + 2] - 3 * phi_p[end - 3, n + 2] + phi_p[end - 4, n + 2]
+        # phi_p[end, n + 2] = 3 * phi_p[end - 1, n + 2] - 3 * phi_p[end - 2, n + 2] + phi_p[end - 3, n + 2]
+
+        # phi[end - 1, n + 1] = 3 * phi[end - 2, n + 1] - 3 * phi[end - 3, n + 1] + phi[end - 4, n + 1]
+        # phi[end, n + 1] = 3 * phi[end - 1, n + 1] - 3 * phi[end - 2, n + 1] + phi[end - 3, n + 1]
 
     end
 end

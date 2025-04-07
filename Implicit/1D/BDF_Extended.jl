@@ -14,7 +14,7 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 6;
 
 # BDF order
 order = 1
@@ -46,7 +46,7 @@ x = range(xL - h, xR + h, length = Nx + 3)
 
 # Time
 T = 1.2
-tau = C * h / maximum(abs.(u.(x)))
+tau = C * h / maximum(abs.(u.(x))) 
 Ntau = Int(round(T / tau))
 
 # Ntau = 1
@@ -68,7 +68,7 @@ phi_first_order = zeros(Nx + 3, Ntau + 3);
 phi[:, 1] = phi_0.(x);
 phi[:, 2] = phi_exact.(x, tau);
 
-# Boundary conditions right side - inflow
+# Boundary conditions - inflow
 phi[1, :] = phi_exact.(x[1], t);
 phi[2, :] = phi_exact.(x[2], t);
 
@@ -87,7 +87,7 @@ sweep_cases = Dict(1 => (3:1:Nx+1), 2 => (Nx+1:-1:3))
 # Time Loop
 for n = 2:Ntau + 1
 
-    for sweep in 1:1
+    for sweep in 1:2
         sw = sweep_cases[sweep]
 
         for i = sw
@@ -96,31 +96,27 @@ for n = 2:Ntau + 1
             phi_first_order[i, n + 1] = ( phi_first_order[i, n] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
             
             # First step of BDF - predictor at time n + 1
-            phi_p[i, n + 1] = ( phi[i, n] + c[i] * ( phi_p[i - 1, n + 1] - 0.5 * ( - 2 * phi_p[i - 1, n + 1] + phi_p[i - 2, n + 1] ) ) ) / ( 1 + 1.5 * c[i] );
+            phi_p[i, n + 1] = ( phi[i, n] + c[i] * ( phi_p[i - 1, n + 1] - 0.5 * ( - 2 * phi_p[i - 1, n + 1] + phi_p[i - 2, n + 1] ) )  ) / ( 1 + 1.5 * c[i] );
+
+            # Second step of BDF - predictor at time n + 2
+            phi_p[i, n + 2] = ( phi_p[i, n + 1] + c[i] * ( phi_p[i - 1, n + 2] - 0.5 * ( - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2]  ) ) ) / ( 1 + 1.5 * c[i] );
+
+            der_x =  c[i] * ( phi_p[i, n + 2] - phi_p[i - 1, n + 2] ) + 0.5 * c[i] * ( phi_p[i, n + 2] - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] );
+            # Final step of the extended BDF scheme
+            phi[i, n + 1] = ( phi[i, n] + 1/2 * der_x + 3/2 * c[i] * ( phi[i - 1, n + 1] - 0.5 * ( - 2 * phi[i - 1, n + 1] + phi[i - 2, n + 1]  ) ) ) / ( 1 + 3/2 * 1.5 * c[i] );
 
         end
+
+        # Outlfow boundary condition on the right
 
         phi_p[end - 1, n + 1] = 3 * phi_p[end - 2, n + 1] - 3 * phi_p[end - 3, n + 1] + phi_p[end - 4, n + 1]
         phi_first_order[end - 1, n + 1] = 3 * phi_first_order[end - 2, n + 1] - 3 * phi_first_order[end - 3, n + 1] + phi_first_order[end - 4, n + 1]
         phi_p[end, n + 1] = 3 * phi_p[end - 1, n + 1] - 3 * phi_p[end - 2, n + 1] + phi_p[end - 3, n + 1]
         phi_first_order[end, n + 1] = 3 * phi_first_order[end - 1, n + 1] - 3 * phi_first_order[end - 2, n + 1] + phi_first_order[end - 3, n + 1]
 
-        for i = sw
-          # Second step of BDF - predictor at time n + 2
-          phi_p[i, n + 2] = ( phi_p[i, n + 1] + c[i] * ( phi_p[i - 1, n + 2] - 0.5 * ( - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] ) ) ) / ( 1 + 1.5 * c[i] );
-
-        end
-
         phi_p[end - 1, n + 2] = 3 * phi_p[end - 2, n + 2] - 3 * phi_p[end - 3, n + 2] + phi_p[end - 4, n + 2]
         phi_p[end, n + 2] = 3 * phi_p[end - 1, n + 2] - 3 * phi_p[end - 2, n + 2] + phi_p[end - 3, n + 2]
 
-        for i = sw
-          der_x =  c[i] * ( phi_p[i, n + 2] - phi_p[i - 1, n + 2] + 0.5 * ( phi_p[i, n + 2] - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] ) )
-          # Final step of the extended BDF scheme
-          phi[i, n + 1] = ( phi[i, n] - 1/2 * der_x + 3/2 * c[i] * ( phi_p[i - 1, n + 1] - 0.5 * ( - 2 * phi_p[i - 1, n + 1] + phi_p[i - 2, n + 1] ) ) ) / ( 1 + 3/2*1.5 * c[i] );
-        end
-
-        # Outlfow boundary condition on the right
         phi[end - 1, n + 1] = 3 * phi[end - 2, n + 1] - 3 * phi[end - 3, n + 1] + phi[end - 4, n + 1]
         phi[end, n + 1] = 3 * phi[end - 1, n + 1] - 3 * phi[end - 2, n + 1] + phi[end - 3, n + 1]
 

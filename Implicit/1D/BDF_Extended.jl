@@ -14,13 +14,23 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 0;
+level = 3;
 
 # BDF order
-order = 1
+order = 2
+
+α0, α1, α2 = 1, -1, 0
+
+if order == 2
+    α0 = 3/2
+    α1 = -2
+    α2 = 1 / 2
+end
 
 # Courant number
 C = 1.5;
+
+ωk = 1/3;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -53,7 +63,6 @@ Ntau = Int(round(T / tau))
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
-
 c = zeros(Nx+3) .+ u.(x) * tau / h
 
 # Set c plus and c minus
@@ -79,16 +88,15 @@ phi_p = copy(phi)
 phi_first_order = copy(phi)
 
 # Right hand side
-function rightHandSide(f, n)
+function rightHandSide(f, n, α1 = α1, α2 = α2)
     b = zeros(Nx + 3)
-    b[:] = f[:, n] # Initial condition
+    b[:] = -α1 .* f[:, n] - α2 .* f[:, n - 1] # Initial condition
     # Boundary - exact solution
     b[end] = phi_exact.(x[end], t[n + 1])
     b[end-1] = phi_exact.(x[end-1], t[n + 1])
     return b
 end
 
-ωk = 0.0;
 
 @time begin
 
@@ -96,7 +104,7 @@ end
 for n = 2:Ntau + 1
 
     # System matrix - FIRST / SECOND ORDER -----------------------------------
-    function Matrix(order, ω0 = 1.0, B1 = 1.0) 
+    function Matrix(order, ω0 = 1.0, B1 = 1.0, α0 = α0) 
         ω = zeros(Nx + 3) .+ ω0
         ω[1] = 1.0
         ω[2] = 1.0
@@ -109,7 +117,7 @@ for n = 2:Ntau + 1
         u_2 = zeros(Nx + 1); # Upper diagonal 2
     
         # System matrix - FIRST ORDER -----------------------------------
-        d = d + B1 .* ( cp - cm ) .+ 1
+        d = d + B1 .* ( cp - cm ) .+ α0
         l_1 = l_1 + B1.* ( - cp[2:end] )
         u_1 = u_1 + B1 .* ( cm[1:end-1] )
         
@@ -154,9 +162,15 @@ for n = 2:Ntau + 1
                             + 0.5 * ( 1 - ωk ) * ( phi_p[i - 1, n + 2] - 2 * phi_p[i, n + 2] + phi_p[i + 1, n + 2] ) ) );
     end    
 
-    B1 = 3/2
-    B2 = -1/2
-    phi[:, n + 1] = Matrix(2, ωk, B1) \ (rightHandSide(phi, n) - B2 * ∂phi_x ) # Solves the system A * x = b
+    B1, B2 = 3/2, -1/2
+    α0_k, α1_k, α2_k = α0, α1, α2
+    if order == 2
+        B1, B2 = 22/23, -4/23
+        # B1, B2 = 1.0, 0.0
+        α0_k, α1_k, α2_k = 1, -28/23, 5/23 
+    end
+
+    phi[:, n + 1] = Matrix(2, ωk, B1, α0_k) \ (rightHandSide(phi, n, α1_k, α2_k) - B2 * ∂phi_x ) # Solves the system A * x = b
 
     # Outlfow boundary condition 
     phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]

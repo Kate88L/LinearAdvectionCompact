@@ -136,10 +136,10 @@ for n = 2:Ntau + 1
     phi_first_order[:, n + 1] = Matrix(1) \ rightHandSide(phi_first_order, n) # Solves the system A * x = b 
 
     # Step 1 - prediction in n + 1
-    phi_p[:, n + 1] = Matrix(2, 0) \ rightHandSide(phi, n) # Solves the system A * x = b
+    phi_p[:, n + 1] = Matrix(2, ωk) \ rightHandSide(phi, n) # Solves the system A * x = b
 
     # Step 2 - prediction in n + 2
-    phi_p[:, n + 2] = Matrix(2, 0) \ rightHandSide(phi_p, n + 1) # Solves the system A * x = b
+    phi_p[:, n + 2] = Matrix(2, ωk) \ rightHandSide(phi_p, n + 1) # Solves the system A * x = b
 
     # Step 3 - compute the right hand side
     ∂phi_x = zeros(Nx + 3)

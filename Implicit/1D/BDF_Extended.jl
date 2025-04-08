@@ -88,7 +88,7 @@ function rightHandSide(f, n)
     return b
 end
 
-ωk = 1.0;
+ωk = 0.0;
 
 @time begin
 
@@ -99,6 +99,8 @@ for n = 2:Ntau + 1
     function Matrix(order, ω0 = 1.0, B1 = 1.0) 
         ω = zeros(Nx + 3) .+ ω0
         ω[1] = 1.0
+        ω[2] = 1.0
+        ω[3] = 1.0
 
         d = zeros(Nx + 3); # Diagonal
         l_1 = zeros(Nx + 2); # Lower diagonal 1
@@ -115,10 +117,10 @@ for n = 2:Ntau + 1
         if order == 1
             A = Tridiagonal(l_1, d, u_1)
         else
-            d0 = d + B1 .* ( 0.5 * cp .* ω - 0.5 * cm .* ω - c .* ( 1 .- ω ) )
-            l_1 = l_1 + B1 .* ( - cp[2:end] .* ω[2:end] + 0.5 * c[2:end] .* ( 1 .- ω[2:end] ) )
+            d0 = d + B1 .* ( 0.5 * cp .* ω - 0.5 * cm .* ω + c .* ( 1 .- ω ) )
+            l_1 = l_1 + B1 .* ( - cp[2:end] .* ω[2:end] - 0.5 * c[2:end] .* ( 1 .- ω[2:end] ) )
             l_2 = l_2 + B1 .* ( 0.5 * cp[3:end] .* ω[3:end] )
-            u_1 = u_1 + B1 .* ( cm[1:end-1] .* ω[1:end-1] + 0.5 * c[1:end-1] .* ( 1 .- ω[1:end-1] ) )
+            u_1 = u_1 + B1 .* ( cm[1:end-1] .* ω[1:end-1] - 0.5 * c[1:end-1] .* ( 1 .- ω[1:end-1] ) )
             u_2 = u_2 + B1 .* ( - 0.5 * cm[1:end-2] .* ω[1:end-2] )
             A = diagm(0 => d0, -1 => l_1, -2 => l_2, 1 => u_1, 2 => u_2)
         end

@@ -14,7 +14,7 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 6;
+level = 0;
 
 # BDF order
 order = 1
@@ -29,15 +29,15 @@ Nx = 40 * 2^level
 h = (xR - xL) / Nx
 
 # Constant velocity example
-# u(x) = -1.0
-# phi_0(x) = cos.(x);
-# phi_exact(x, t) = phi_0.(x - u.(x) * t);    
+u(x) = -1.0
+phi_0(x) = cos.(x);
+phi_exact(x, t) = phi_0.(x - u.(x) * t);    
 
 # Variable velocity example
-offset = 0.5
-u(x) = sin.(x - offset)
-phi_0(x) = sin.(x - offset);
-phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
+# offset = 0.5
+# u(x) = sin.(x - offset)
+# phi_0(x) = sin.(x - offset);
+# phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
 
 ## Comptutation
 
@@ -78,67 +78,88 @@ phi[end-1, :] = phi_exact.(x[end-1], t);
 phi_p = copy(phi)
 phi_first_order = copy(phi)
 
-# ENO parameters
-ω = zeros(Nx + 1);
-α = zeros(Nx + 1);
+# Right hand side
+function rightHandSide(f, n)
+    b = zeros(Nx + 3)
+    b[:] = f[:, n] # Initial condition
+    # Boundary - exact solution
+    b[end] = phi_exact.(x[end], t[n + 1])
+    b[end-1] = phi_exact.(x[end-1], t[n + 1])
+    return b
+end
 
-# Fast sweeping
-sweep_cases = Dict(1 => (3:1:Nx+1), 2 => (Nx+1:-1:3))
+ωk = 1.0;
 
 @time begin
 
 # Time Loop
 for n = 2:Ntau + 1
 
-    for sweep in 1:2
-        sw = sweep_cases[sweep]
+    # System matrix - FIRST / SECOND ORDER -----------------------------------
+    function Matrix(order, ω0 = 1.0, B1 = 1.0) 
+        ω = zeros(Nx + 3) .+ ω0
+        ω[1] = 1.0
 
-        for i = sw
-
-            # First order solution
-            phi_first_order[i, n + 1] = ( phi_first_order[i, n] + cp[i] * phi_first_order[i - 1, n + 1] - cm[i] * phi_first_order[i + 1, n + 1] ) / ( 1 + cp[i] - cm[i] );
-            
-            # First step of BDF - predictor at time n + 1
-            phi_p[i, n + 1] = ( phi[i, n] + cp[i] * ( phi_p[i - 1, n + 1] - 0.5 * ( - 2 * phi_p[i - 1, n + 1] + phi_p[i - 2, n + 1] ) ) -  
-                                            cm[i] * ( phi_p[i + 1, n + 1] - 0.5 * ( - 2 * phi_p[i + 1, n + 1] + phi_p[i + 2, n + 1] ) ) ) / ( 1 + 1.5 * cp[i] - 1.5 * cm[i] );
-
-            # Second step of BDF - predictor at time n + 2
-            phi_p[i, n + 2] = ( phi_p[i, n + 1] + cp[i] * ( phi_p[i - 1, n + 2] - 0.5 * ( - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2]  ) ) -
-                                                  cm[i] * ( phi_p[i + 1, n + 2] - 0.5 * ( - 2 * phi_p[i + 1, n + 2] + phi_p[i + 2, n + 2]  ) ) ) / ( 1 + 1.5 * cp[i] - 1.5 * cm[i] );
-
-            der_x = ( cp[i] * ( ( phi_p[i, n + 2] - phi_p[i - 1, n + 2] ) + 0.5 * ( phi_p[i, n + 2] - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] ) ) -
-                      cm[i] * ( ( phi_p[i, n + 2] - phi_p[i + 1, n + 2] ) + 0.5 * ( phi_p[i, n + 2] - 2 * phi_p[i + 1, n + 2] + phi_p[i + 2, n + 2] ) ) );
-            # Final step of the extended BDF scheme
-            phi[i, n + 1] = ( phi[i, n] + 1/2 * der_x + 3/2 * cp[i] * ( phi[i - 1, n + 1] - 0.5 * ( - 2 * phi[i - 1, n + 1] + phi[i - 2, n + 1]  ) ) -
-                                                        3/2 * cm[i] * ( phi[i + 1, n + 1] - 0.5 * ( - 2 * phi[i + 1, n + 1] + phi[i + 2, n + 1]  ) ) ) / ( 1 + 3/2 * 1.5 * cp[i] - 3/2 * 1.5 * cm[i] );
-
+        d = zeros(Nx + 3); # Diagonal
+        l_1 = zeros(Nx + 2); # Lower diagonal 1
+        l_2 = zeros(Nx + 1); # Lower diagonal 2
+        u_1 = zeros(Nx + 2); # Upper diagonal 1
+        u_2 = zeros(Nx + 1); # Upper diagonal 2
+    
+        # System matrix - FIRST ORDER -----------------------------------
+        d = d + B1 .* ( cp - cm ) .+ 1
+        l_1 = l_1 + B1.* ( - cp[2:end] )
+        u_1 = u_1 + B1 .* ( cm[1:end-1] )
+        
+        # System matrix - SECOND ORDER -----------------------------------
+        if order == 1
+            A = Tridiagonal(l_1, d, u_1)
+        else
+            d0 = d + B1 .* ( 0.5 * cp .* ω - 0.5 * cm .* ω - c .* ( 1 .- ω ) )
+            l_1 = l_1 + B1 .* ( - cp[2:end] .* ω[2:end] + 0.5 * c[2:end] .* ( 1 .- ω[2:end] ) )
+            l_2 = l_2 + B1 .* ( 0.5 * cp[3:end] .* ω[3:end] )
+            u_1 = u_1 + B1 .* ( cm[1:end-1] .* ω[1:end-1] + 0.5 * c[1:end-1] .* ( 1 .- ω[1:end-1] ) )
+            u_2 = u_2 + B1 .* ( - 0.5 * cm[1:end-2] .* ω[1:end-2] )
+            A = diagm(0 => d0, -1 => l_1, -2 => l_2, 1 => u_1, 2 => u_2)
         end
 
-        # Outlfow boundary condition 
-        phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
-        phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
+        # Boundary conditions - inflow
+        A[end-1,:] .= 0.0
+        A[end, :] .= 0.0
+        A[end, end] = 1.0
+        A[end-1, end-1] = 1.0
 
-        phi_first_order[2, n + 1] = 3 * phi_first_order[3, n + 1] - 3 * phi_first_order[4, n + 1] + phi_first_order[5, n + 1]
-        phi_first_order[1, n + 1] = 3 * phi_first_order[2, n + 1] - 3 * phi_first_order[3, n + 1] + phi_first_order[4, n + 1]
-
-        phi_p[2, n + 1] = 3 * phi_p[3, n + 1] - 3 * phi_p[4, n + 1] + phi_p[5, n + 1]
-        phi_p[1, n + 1] = 3 * phi_p[2, n + 1] - 3 * phi_p[3, n + 1] + phi_p[4, n + 1]
-
-        phi_p[2, n + 2] = 3 * phi_p[3, n + 2] - 3 * phi_p[4, n + 2] + phi_p[5, n + 2]
-        phi_p[1, n + 2] = 3 * phi_p[2, n + 2] - 3 * phi_p[3, n + 2] + phi_p[4, n + 2]
-
-        # phi_p[end - 1, n + 1] = 3 * phi_p[end - 2, n + 1] - 3 * phi_p[end - 3, n + 1] + phi_p[end - 4, n + 1]
-        # phi_first_order[end - 1, n + 1] = 3 * phi_first_order[end - 2, n + 1] - 3 * phi_first_order[end - 3, n + 1] + phi_first_order[end - 4, n + 1]
-        # phi_p[end, n + 1] = 3 * phi_p[end - 1, n + 1] - 3 * phi_p[end - 2, n + 1] + phi_p[end - 3, n + 1]
-        # phi_first_order[end, n + 1] = 3 * phi_first_order[end - 1, n + 1] - 3 * phi_first_order[end - 2, n + 1] + phi_first_order[end - 3, n + 1]
-
-        # phi_p[end - 1, n + 2] = 3 * phi_p[end - 2, n + 2] - 3 * phi_p[end - 3, n + 2] + phi_p[end - 4, n + 2]
-        # phi_p[end, n + 2] = 3 * phi_p[end - 1, n + 2] - 3 * phi_p[end - 2, n + 2] + phi_p[end - 3, n + 2]
-
-        # phi[end - 1, n + 1] = 3 * phi[end - 2, n + 1] - 3 * phi[end - 3, n + 1] + phi[end - 4, n + 1]
-        # phi[end, n + 1] = 3 * phi[end - 1, n + 1] - 3 * phi[end - 2, n + 1] + phi[end - 3, n + 1]
-
+        return A
     end
+
+    # First order solution
+    phi_first_order[:, n + 1] = Matrix(1) \ rightHandSide(phi_first_order, n) # Solves the system A * x = b 
+
+    # Step 1 - prediction in n + 1
+    phi_p[:, n + 1] = Matrix(2, 0) \ rightHandSide(phi, n) # Solves the system A * x = b
+
+    # Step 2 - prediction in n + 2
+    phi_p[:, n + 2] = Matrix(2, 0) \ rightHandSide(phi_p, n + 1) # Solves the system A * x = b
+
+    # Step 3 - compute the right hand side
+    ∂phi_x = zeros(Nx + 3)
+    for i = 3:Nx+1 
+        ∂phi_x[i] = ( cp[i] * ( ( phi_p[i, n + 2] - phi_p[i - 1, n + 2] ) 
+                            + 0.5 * ωk * ( phi_p[i, n + 2] - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] ) 
+                            + 0.5 * ( 1 - ωk ) * ( phi_p[i - 1, n + 2] - 2 * phi_p[i, n + 2] + phi_p[i + 1, n + 2] ) ) -
+                      cm[i] * ( ( phi_p[i, n + 2] - phi_p[i + 1, n + 2] ) 
+                            + 0.5 * ωk *( phi_p[i, n + 2] - 2 * phi_p[i + 1, n + 2] + phi_p[i + 2, n + 2] )
+                            + 0.5 * ( 1 - ωk ) * ( phi_p[i - 1, n + 2] - 2 * phi_p[i, n + 2] + phi_p[i + 1, n + 2] ) ) );
+    end    
+
+    B1 = 3/2
+    B2 = -1/2
+    phi[:, n + 1] = Matrix(2, ωk, B1) \ (rightHandSide(phi, n) - B2 * ∂phi_x ) # Solves the system A * x = b
+
+    # Outlfow boundary condition 
+    phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
+    phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
+    
 end
 end
 # Print error

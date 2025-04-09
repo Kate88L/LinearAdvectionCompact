@@ -14,7 +14,7 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 3;
+level = 4;
 
 # BDF order
 order = 2
@@ -39,15 +39,15 @@ Nx = 40 * 2^level
 h = (xR - xL) / Nx
 
 # Constant velocity example
-u(x) = -1.0
-phi_0(x) = cos.(x);
-phi_exact(x, t) = phi_0.(x - u.(x) * t);    
+# u(x) = -1.0
+# phi_0(x) = cos.(x);
+# phi_exact(x, t) = phi_0.(x - u.(x) * t);    
 
 # Variable velocity example
-# offset = 0.5
-# u(x) = sin.(x - offset)
-# phi_0(x) = sin.(x - offset);
-# phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
+offset = 0.5
+u(x) = sin.(x - offset)
+phi_0(x) = sin.(x - offset);
+phi_exact(x, t) = sin.( 2 * atan.( exp.(-t) .* tan.( (x-offset) ./ 2) ) )
 
 ## Comptutation
 
@@ -94,6 +94,8 @@ function rightHandSide(f, n, α1 = α1, α2 = α2)
     # Boundary - exact solution
     b[end] = phi_exact.(x[end], t[n + 1])
     b[end-1] = phi_exact.(x[end-1], t[n + 1])
+    # b[2] = phi_exact.(x[2], t[n + 1])
+    # b[1] = phi_exact.(x[1], t[n + 1])
     return b
 end
 
@@ -110,6 +112,10 @@ for n = 2:Ntau + 1
         ω[2] = 1.0
         ω[3] = 1.0
 
+        # ω[end] = 1.0
+        # ω[end-1] = 1.0
+        # ω[end-2] = 1.0
+
         d = zeros(Nx + 3); # Diagonal
         l_1 = zeros(Nx + 2); # Lower diagonal 1
         l_2 = zeros(Nx + 1); # Lower diagonal 2
@@ -125,10 +131,10 @@ for n = 2:Ntau + 1
         if order == 1
             A = Tridiagonal(l_1, d, u_1)
         else
-            d0 = d + B1 .* ( 0.5 * cp .* ω - 0.5 * cm .* ω + c .* ( 1 .- ω ) )
-            l_1 = l_1 + B1 .* ( - cp[2:end] .* ω[2:end] - 0.5 * c[2:end] .* ( 1 .- ω[2:end] ) )
+            d0 = d + B1 .* ( 0.5 * cp .* ω - 0.5 * cm .* ω - cp .* ( 1 .- ω ) + cm .* ( 1 .- ω ) )
+            l_1 = l_1 + B1 .* ( - cp[2:end] .* ω[2:end] + 0.5 * cp[2:end] .* ( 1 .- ω[2:end] ) - 0.5 * cm[2:end] .* ( 1 .- ω[2:end] ) )
             l_2 = l_2 + B1 .* ( 0.5 * cp[3:end] .* ω[3:end] )
-            u_1 = u_1 + B1 .* ( cm[1:end-1] .* ω[1:end-1] - 0.5 * c[1:end-1] .* ( 1 .- ω[1:end-1] ) )
+            u_1 = u_1 + B1 .* ( cm[1:end-1] .* ω[1:end-1] + 0.5 * cp[1:end-1] .* ( 1 .- ω[1:end-1] ) - 0.5 * cm[1:end-1] .* ( 1 .- ω[1:end-1] ))
             u_2 = u_2 + B1 .* ( - 0.5 * cm[1:end-2] .* ω[1:end-2] )
             A = diagm(0 => d0, -1 => l_1, -2 => l_2, 1 => u_1, 2 => u_2)
         end
@@ -138,6 +144,11 @@ for n = 2:Ntau + 1
         A[end, :] .= 0.0
         A[end, end] = 1.0
         A[end-1, end-1] = 1.0
+
+        # A[1, :] .= 0.0
+        # A[2, :] .= 0.0  
+        # A[1, 1] = 1.0
+        # A[2, 2] = 1.0
 
         return A
     end
@@ -175,6 +186,8 @@ for n = 2:Ntau + 1
     # Outlfow boundary condition 
     phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
     phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
+    # phi[end-1, n + 1] = 3 * phi[end-2, n + 1] - 3 * phi[end-3, n + 1] + phi[end-4, n + 1]
+    # phi[end, n + 1] = 3 * phi[end-1, n + 1] - 3 * phi[end-2, n + 1] + phi[end-3, n + 1]
     
 end
 end

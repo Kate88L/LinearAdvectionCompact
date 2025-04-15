@@ -1,4 +1,4 @@
-# Extended BDF scheme for linear advection equation
+# Deferred correction scheme for linear advection equation
 
 using LinearAlgebra
 using PlotlyJS
@@ -14,23 +14,16 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 1;
+level = 0;
 
-# BDF order
-order = 2
-
-α0, α1, α2 = 1, -1, 0
-
-if order == 2
-    α0 = 3/2
-    α1 = -2
-    α2 = 1 / 2
-end
+# Number of DEC iterations (accuracy is k + 1)
+k = 2
 
 # Courant number
 C = 1.5;
 
 ωk = 1/3;
+αk = 1/3;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -71,6 +64,7 @@ cm = min.(c, 0)
 
 phi = zeros(Nx + 3, Ntau + 3);
 phi_p = zeros(Nx + 3, Ntau + 3);
+phi_p2 = zeros(Nx + 3, Ntau + 3);
 phi_first_order = zeros(Nx + 3, Ntau + 3);
 
 # Initial condition
@@ -85,12 +79,13 @@ phi[end-1, :] = phi_exact.(x[end-1], t);
 # phi[1, :] = phi_exact.(x[1], t);
 
 phi_p = copy(phi)
+phi_p2 = copy(phi)
 phi_first_order = copy(phi)
 
 # Right hand side
-function rightHandSide(f, n, α1 = α1, α2 = α2)
+function rightHandSide(f, n)
     b = zeros(Nx + 3)
-    b[:] = -α1 .* f[:, n] - α2 .* f[:, n - 1] # Initial condition
+    b[:] = f[:, n] # Initial condition
     # Boundary - exact solution
     b[end] = phi_exact.(x[end], t[n + 1])
     b[end-1] = phi_exact.(x[end-1], t[n + 1])
@@ -99,90 +94,81 @@ function rightHandSide(f, n, α1 = α1, α2 = α2)
     return b
 end
 
+# System matrix - FIRST ORDER -----------------------------------
+function L1() 
+    d = zeros(Nx + 3); # Diagonal
+    l_1 = zeros(Nx + 2); # Lower diagonal 1
+    u_1 = zeros(Nx + 2); # Upper diagonal 1
+
+    d = d .+ 1 .+ ( cp - cm )
+    l_1 = l_1 + ( - cp[2:end] )
+    u_1 = u_1 + ( cm[1:end-1] )
+    
+    A = Tridiagonal(l_1, d, u_1)
+
+    # Boundary conditions - inflow
+    A[end-1,:] .= 0.0
+    A[end, :] .= 0.0
+    A[end, end] = 1.0
+    A[end-1, end-1] = 1.0
+
+    # A[1, :] .= 0.0
+    # A[2, :] .= 0.0  
+    # A[1, 1] = 1.0
+    # A[2, 2] = 1.0
+
+    return A
+end
+
 
 @time begin
 
 # Time Loop
 for n = 2:Ntau + 1
 
-    # System matrix - FIRST / SECOND ORDER -----------------------------------
-    function Matrix(order, ω0 = 1.0, B1 = 1.0, α0 = α0) 
-        ω = zeros(Nx + 3) .+ ω0
-        ω[1] = 1.0
-        ω[2] = 1.0
-        ω[3] = 1.0
-
-        # ω[end] = 1.0
-        # ω[end-1] = 1.0
-        # ω[end-2] = 1.0
-
-        d = zeros(Nx + 3); # Diagonal
-        l_1 = zeros(Nx + 2); # Lower diagonal 1
-        l_2 = zeros(Nx + 1); # Lower diagonal 2
-        u_1 = zeros(Nx + 2); # Upper diagonal 1
-        u_2 = zeros(Nx + 1); # Upper diagonal 2
+    function L2(f, n, α = αk, ω = ωk)
+        b = zeros(Nx + 3)
     
-        # System matrix - FIRST ORDER -----------------------------------
-        d = d + B1 .* ( cp - cm ) .+ α0
-        l_1 = l_1 + B1.* ( - cp[2:end] )
-        u_1 = u_1 + B1 .* ( cm[1:end-1] )
-        
-        # System matrix - SECOND ORDER -----------------------------------
-        if order == 1
-            A = Tridiagonal(l_1, d, u_1)
+        # Simplified notation for easier reading
+        i = 3:Nx + 1
+        ip = 4:Nx + 2
+        ipp = 5:Nx + 3
+        im = 2:Nx
+        imm = 1:Nx - 1
+    
+        if n > Ntau + 1
+            b[i] = b[i] + 0.5 * ( f[i, n] - f[i, n - 1] - phi[i, n - 1] + phi[i, n - 2] )
         else
-            d0 = d + B1 .* ( 0.5 * cp .* ω - 0.5 * cm .* ω - cp .* ( 1 .- ω ) + cm .* ( 1 .- ω ) )
-            l_1 = l_1 + B1 .* ( - cp[2:end] .* ω[2:end] + 0.5 * cp[2:end] .* ( 1 .- ω[2:end] ) - 0.5 * cm[2:end] .* ( 1 .- ω[2:end] ) )
-            l_2 = l_2 + B1 .* ( 0.5 * cp[3:end] .* ω[3:end] )
-            u_1 = u_1 + B1 .* ( cm[1:end-1] .* ω[1:end-1] + 0.5 * cp[1:end-1] .* ( 1 .- ω[1:end-1] ) - 0.5 * cm[1:end-1] .* ( 1 .- ω[1:end-1] ))
-            u_2 = u_2 + B1 .* ( - 0.5 * cm[1:end-2] .* ω[1:end-2] )
-            A = diagm(0 => d0, -1 => l_1, -2 => l_2, 1 => u_1, 2 => u_2)
+            b[i] = b[i] + 0.5 * ( α .* ( f[i, n] - f[i, n - 1] - phi[i, n - 1] + phi[i, n - 2] ) +
+                                ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + phi[i, n - 1] ) )
         end
-
-        # Boundary conditions - inflow
-        A[end-1,:] .= 0.0
-        A[end, :] .= 0.0
-        A[end, end] = 1.0
-        A[end-1, end-1] = 1.0
-
-        # A[1, :] .= 0.0
-        # A[2, :] .= 0.0  
-        # A[1, 1] = 1.0
-        # A[2, 2] = 1.0
-
-        return A
+    
+        b[i] = b[i] + (  0.5 * ( + cp[i] .* ( ω .* ( f[i, n] - 2 * f[im, n] + f[imm, n] ) +
+                                            ( 1 - ω ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) )
+                                  - cm[i] .* ( ω .* ( f[i, n] - 2 * f[ip, n] + f[ipp, n] )  +
+                                            ( 1 - ω ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) ) ) )             
+        return b
     end
 
     # First order solution
-    phi_first_order[:, n + 1] = Matrix(1) \ rightHandSide(phi_first_order, n) # Solves the system A * x = b 
+    phi_first_order[:, n + 1] = L1() \ rightHandSide(phi_first_order, n) # Solves the system A * x = b 
 
-    # Step 1 - prediction in n + 1
-    phi_p[:, n + 1] = Matrix(2, ωk) \ rightHandSide(phi, n) # Solves the system A * x = b
+    # Iteration 0 : first order solution of the system
+    phi_p[:, n + 1] = L1() \ rightHandSide(phi, n) # Solves the system L1p = b
 
-    # Step 2 - prediction in n + 2
-    phi_p[:, n + 2] = Matrix(2, ωk) \ rightHandSide(phi_p, n + 1) # Solves the system A * x = b
+    # Iteration 0+ : first order predictor in the future
+    phi_p[:, n + 2] = L1() \ rightHandSide(phi_p, n + 1) # Solves the system L1p = b
 
-    # Step 3 - compute the right hand side
-    ∂phi_x = zeros(Nx + 3)
-    for i = 3:Nx+1 
-        ∂phi_x[i] = ( cp[i] * ( ( phi_p[i, n + 2] - phi_p[i - 1, n + 2] ) 
-                            + 0.5 * ωk * ( phi_p[i, n + 2] - 2 * phi_p[i - 1, n + 2] + phi_p[i - 2, n + 2] ) 
-                            + 0.5 * ( 1 - ωk ) * ( phi_p[i - 1, n + 2] - 2 * phi_p[i, n + 2] + phi_p[i + 1, n + 2] ) ) -
-                      cm[i] * ( ( phi_p[i, n + 2] - phi_p[i + 1, n + 2] ) 
-                            + 0.5 * ωk *( phi_p[i, n + 2] - 2 * phi_p[i + 1, n + 2] + phi_p[i + 2, n + 2] )
-                            + 0.5 * ( 1 - ωk ) * ( phi_p[i - 1, n + 2] - 2 * phi_p[i, n + 2] + phi_p[i + 1, n + 2] ) ) );
-    end    
+    # Iteration 1 : second order solution of the system
+    phi_p2[:, n + 1] = L1() \ ( rightHandSide(phi, n) - L2(phi_p, n + 1, 1, 1) ) # Solves the system L1 = L1p - L2p
 
-    B1, B2 = 3/2, -1/2
-    α0_k, α1_k, α2_k = α0, α1, α2
-    if order == 2
-        B1, B2 = 22/23, -4/23
-        # B1, B2 = 1.0, 0.0
-        α0_k, α1_k, α2_k = 1, -28/23, 5/23 
+    phi[:, n + 1] = phi_p2[:, n + 1] # Assign second order solution to the main variable
+    if k > 1
+        # Iteration 1+ : second order solution of the system in the future
+        phi_p2[:, n + 2] = L1() \ ( rightHandSide(phi_p2, n + 1) - L2(phi_p, n + 2, 1, 1) ) # Solves the system L1 = L1p - L2p 
+        # Iteration 2 : third order solution of the system
+        phi[:, n + 1] = L1() \ ( rightHandSide(phi, n) - L2(phi_p2, n + 1) ) # Solves the system L1 = L1p - L2p
     end
-
-    phi[:, n + 1] = Matrix(2, ωk, B1, α0_k) \ (rightHandSide(phi, n, α1_k, α2_k) - B2 * ∂phi_x ) # Solves the system A * x = b
-
     # Outlfow boundary condition 
     phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
     phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]

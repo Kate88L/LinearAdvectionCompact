@@ -23,7 +23,7 @@ k = 2
 C = 1.5;
 
 ωk = 1/3;
-αk = 1/3;
+αk = 0;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -140,7 +140,7 @@ for n = 2:Ntau + 1
             b[i] = b[i] + 0.5 * ( f[i, n] - f[i, n - 1] - phi[i, n - 1] + phi[i, n - 2] )
         else
             b[i] = b[i] + 0.5 * ( α .* ( f[i, n] - f[i, n - 1] - phi[i, n - 1] + phi[i, n - 2] ) +
-                                ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + phi[i, n - 1] ) )
+                                ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - phi[i, n] + phi[i, n - 1] ) )
         end
     
         b[i] = b[i] + (  0.5 * ( + cp[i] .* ( ω .* ( f[i, n] - 2 * f[im, n] + f[imm, n] ) +
@@ -163,6 +163,7 @@ for n = 2:Ntau + 1
     phi_p2[:, n + 1] = L1() \ ( rightHandSide(phi, n) - L2(phi_p, n + 1, 1, 1) ) # Solves the system L1 = L1p - L2p
 
     phi[:, n + 1] = phi_p2[:, n + 1] # Assign second order solution to the main variable
+
     if k > 1
         # Iteration 1+ : second order solution of the system in the future
         phi_p2[:, n + 2] = L1() \ ( rightHandSide(phi_p2, n + 1) - L2(phi_p, n + 2, 1, 1) ) # Solves the system L1 = L1p - L2p 
@@ -172,6 +173,7 @@ for n = 2:Ntau + 1
     # Outlfow boundary condition 
     phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
     phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]
+
     # phi[end-1, n + 1] = 3 * phi[end-2, n + 1] - 3 * phi[end-3, n + 1] + phi[end-4, n + 1]
     # phi[end, n + 1] = 3 * phi[end-1, n + 1] - 3 * phi[end-2, n + 1] + phi[end-3, n + 1]
     

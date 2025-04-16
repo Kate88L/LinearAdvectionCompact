@@ -23,7 +23,7 @@ k = 2
 C = 1.5;
 
 ωk = 1/3;
-αk = 0;
+αk = 1/3;
 
 # Grid settings
 xL = - 1 * π / 2
@@ -140,7 +140,7 @@ for n = 2:Ntau + 1
             b[i] = b[i] + 0.5 * ( f[i, n] - f[i, n - 1] - phi[i, n - 1] + phi[i, n - 2] )
         else
             b[i] = b[i] + 0.5 * ( α .* ( f[i, n] - f[i, n - 1] - phi[i, n - 1] + phi[i, n - 2] ) +
-                                ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - phi[i, n] + phi[i, n - 1] ) )
+                                ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + phi[i, n - 1] ) )
         end
     
         b[i] = b[i] + (  0.5 * ( + cp[i] .* ( ω .* ( f[i, n] - 2 * f[im, n] + f[imm, n] ) +

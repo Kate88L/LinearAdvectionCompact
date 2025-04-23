@@ -14,16 +14,13 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 7;
+level = 3;
 
 # Number of DEC iterations (accuracy is k + 1)
 k = 2
 
 # Courant number
 C = 1.5;
-
-ωk = 1/3;
-αk = 1/3;
 
 # Grid settings
 xL = - 1 * π / 2 * 0
@@ -35,6 +32,7 @@ h = (xR - xL) / Nx
 u(x) = -1.0
 # phi_0(x) = cos.(x);
 phi_0(x) = exp(-40 * (x-0.75*1.5).^2)
+# phi_0(x) = piecewiseLinear(x - 0.7);
 phi_exact(x, t) = phi_0.(x - u.(x) * t);    
 
 # Variable velocity example
@@ -62,6 +60,9 @@ c = zeros(Nx+3) .+ u.(x) * tau / h
 # Set c plus and c minus
 cp = max.(c, 0)
 cm = min.(c, 0)
+
+ω = zeros(Nx + 3, Ntau + 3) .+ 1
+α = zeros(Nx + 3, Ntau + 3) .+ 1
 
 phi = zeros(Nx + 3, Ntau + 3);
 phi_p = zeros(Nx + 3, Ntau + 3);
@@ -121,7 +122,31 @@ function L1()
     return A
 end
 
-function L2(f, n, α = αk, ω = ωk)
+function ENO(f, n)
+    α = zeros(Nx + 3) .+ 1
+    ω = zeros(Nx + 3) .+ 1
+
+    # Simplified notation for easier reading
+    i = 3:Nx + 1
+    ip = 4:Nx + 2
+    ipp = 5:Nx + 3
+    im = 2:Nx
+    imm = 1:Nx - 1
+
+    # ENO reconstruction
+    ru_i = f[i, n] - 2 * f[ip, n] + f[ipp, n]
+    rd_i = f[ip, n] - 2 * f[i, n] + f[im, n]
+
+    ru_n = f[i, n] - 2 * f[i, n - 1] + f[i, n - 2]
+    rd_n = f[i, n - 1] - 2 * f[i, n] + f[i, n + 1]
+
+    ω[3:Nx + 1] .= ifelse.(abs.(ru_i) .< abs.(rd_i), 1, 0)
+    α[3:Nx + 1] .= ifelse.(abs.(ru_n) .< abs.(rd_n), 1, 0)
+
+    return ω, α
+end
+
+function L2(f, n, limiter = false, third_order = false)
     b = zeros(Nx + 3)
 
     # Simplified notation for easier reading
@@ -131,19 +156,32 @@ function L2(f, n, α = αk, ω = ωk)
     im = 2:Nx
     imm = 1:Nx - 1
 
+    if limiter
+        global ω[:, n], α[:, n] = ENO(f, n)
+    else
+        if third_order
+            global ω[:, n] .= 1/3
+            global α[:, n] .= 1/3
+        else
+            global ω[:, n] .= 1
+            global α[:, n] .= 1
+        end
+    end
+
     if n > Ntau + 1
         b[i] = b[i] + 0.5 * ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] )
     else
-        b[i] = b[i] + 0.5 * ( α .* ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] ) +
-                            ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + f[i, n - 1] ) )
+        b[i] = b[i] + 0.5 * ( α[i, n] .* ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] ) +
+                            ( 1 .- α[i, n] ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + f[i, n - 1] ) )
     end
 
-    b[i] = b[i] + (  0.5 * ( + cp[i] .* ( ω .* ( f[i, n] - 2 * f[im, n] + f[imm, n] ) +
-                                        ( 1 - ω ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) )
-                              - cm[i] .* ( ω .* ( f[i, n] - 2 * f[ip, n] + f[ipp, n] )  +
-                                        ( 1 - ω ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) ) ) )             
+    b[i] = b[i] + (  0.5 * ( + cp[i] .* ( ω[i, n] .* ( f[i, n] - 2 * f[im, n] + f[imm, n] ) +
+                                        ( 1 .- ω[i, n] ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) )
+                              - cm[i] .* ( ω[i, n] .* ( f[i, n] - 2 * f[ip, n] + f[ipp, n] )  +
+                                        ( 1 .- ω[i, n] ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) ) ) )             
     return b
 end
+
 
 @time begin
 
@@ -158,21 +196,21 @@ for n = 2:Ntau + 1
     phi_first_order[:, n + 1] = L1() \ rightHandSide(phi_first_order, n) # Solves the system A * x = b 
 
     # Iteration 0 : first order solution of the system
-    phi_p[:, n + 1] = L1() \ rightHandSide(phi_p, n) # Solves the system L1p = b
+    phi_p[:, n + 1] = L1() \ rightHandSide(phi, n) # Solves the system L1p = b
 
     # Iteration 0+ : first order predictor in the future
     phi_p[:, n + 2] = L1() \ rightHandSide(phi_p, n + 1) # Solves the system L1p = b
 
     # Iteration 1 : second order solution of the system
-    phi_p2[:, n + 1] = L1() \ ( rightHandSide(phi_p2, n) - L2(phi_p, n + 1, 1, 1) ) # Solves the system L1 = L1p - L2p
+    phi_p2[:, n + 1] = L1() \ ( rightHandSide(phi_p2, n) - L2(phi_p, n + 1, false) ) # Solves the system L1 = L1p - L2p
 
     phi[:, n + 1] = phi_p2[:, n + 1] # Assign second order solution to the main variable
 
     if k > 1
         # Iteration 1+ : second order solution of the system in the future
-        phi_p2[:, n + 2] = L1() \ ( rightHandSide(phi_p2, n + 1) - L2(phi_p, n + 2, 1, 1) ) # Solves the system L1 = L1p - L2p 
+        phi_p2[:, n + 2] = L1() \ ( rightHandSide(phi_p2, n + 1) - L2(phi_p, n + 2) ) # Solves the system L1 = L1p - L2p 
         # Iteration 2 : third order solution of the system
-        phi[:, n + 1] = L1() \ ( rightHandSide(phi, n) - L2(phi_p2, n + 1, 1/3, 1/3) ) # Solves the system L1 = L1p - L2p
+        phi[:, n + 1] = L1() \ ( rightHandSide(phi, n) - L2(phi_p2, n + 1, false, true) ) # Solves the system L1 = L1p - L2p
     end
     # Outlfow boundary condition 
     phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]

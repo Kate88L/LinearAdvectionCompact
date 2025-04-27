@@ -14,7 +14,7 @@ include("../../Utils/Utils.jl")
 ## Definition of basic parameters
 
 # Level of refinement
-level = 7;
+level = 3;
 
 # Number of DEC iterations (accuracy is k + 1)
 k = 2
@@ -34,7 +34,7 @@ h = (xR - xL) / Nx
 # Constant velocity example
 u(x) = -1.0
 # phi_0(x) = cos.(x);
-phi_0(x) = exp(-40 * (x-0.75*1.5).^2)
+phi_0(x) = exp(-40 * (x-0.55*1.5).^2)
 phi_exact(x, t) = phi_0.(x - u.(x) * t);    
 
 # Variable velocity example
@@ -49,11 +49,11 @@ phi_exact(x, t) = phi_0.(x - u.(x) * t);
 x = range(xL - h, xR + h, length = Nx + 3)
 
 # Time
-T = 1.2 /2
+T = 1.2 /20
 tau = C * h / maximum(abs.(u.(x))) 
 Ntau = Int(round(T / tau))
 
-# Ntau = 1
+# Ntau = 10
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
@@ -133,6 +133,8 @@ function L2(f, n, α = αk, ω = ωk)
 
     if n > Ntau + 1
         b[i] = b[i] + 0.5 * ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] )
+    elseif n < 3
+        b[i] = b[i] + 0.5 * ( f[i, n + 1] - f[i, n] - f[i, n] + phi_exact.(x[i], t[n - 1]) )
     else
         b[i] = b[i] + 0.5 * ( α .* ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] ) +
                             ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + f[i, n - 1] ) )
@@ -149,7 +151,7 @@ end
 
 n = 1
 # Iteration 0 : first order solution of the system
-phi_p[:, n + 1] = L1() \ rightHandSide(phi_p, n) # Solves the system L1p = b
+# phi_p[:, n + 1] = L1() \ rightHandSide(phi_p, n) # Solves the system L1p = b
 
 # Time Loop
 for n = 2:Ntau + 1
@@ -158,22 +160,24 @@ for n = 2:Ntau + 1
     phi_first_order[:, n + 1] = L1() \ rightHandSide(phi_first_order, n) # Solves the system A * x = b 
 
     # Iteration 0 : first order solution of the system
-    phi_p[:, n + 1] = L1() \ rightHandSide(phi_p, n) # Solves the system L1p = b
-
-    # Iteration 0+ : first order predictor in the future
-    phi_p[:, n + 2] = L1() \ rightHandSide(phi_p, n + 1) # Solves the system L1p = b
+    phi_p[:, n] = L1() \ rightHandSide(phi, n - 1) # Solves the system L1p = b
+    phi_p[:, n + 1] = L1() \ rightHandSide(phi, n) # Solves the system L1p = b
 
     # Iteration 1 : second order solution of the system
-    phi_p2[:, n + 1] = L1() \ ( rightHandSide(phi_p2, n) - L2(phi_p, n + 1, 1, 1) ) # Solves the system L1 = L1p - L2p
+    phi_p2[:, n] = L1() \ ( rightHandSide(phi, n - 1) - L2(phi_p, n, 1, 1) ) # Solves the system L1 = L1p - L2p
+    phi_p2[:, n + 1] = L1() \ ( rightHandSide(phi, n) - L2(phi_p, n + 1, 1, 1) ) # Solves the system L1 = L1p - L2p
 
     phi[:, n + 1] = phi_p2[:, n + 1] # Assign second order solution to the main variable
 
     if k > 1
+        # Iteration 0+ : first order predictor in the future
+        phi_p[:, n + 2] = L1() \ rightHandSide(phi, n + 1) # Solves the system L1p = b
         # Iteration 1+ : second order solution of the system in the future
-        phi_p2[:, n + 2] = L1() \ ( rightHandSide(phi_p2, n + 1) - L2(phi_p, n + 2, 1, 1) ) # Solves the system L1 = L1p - L2p 
+        phi_p2[:, n + 2] = L1() \ ( rightHandSide(phi, n + 1) - L2(phi_p, n + 2, 1, 1) ) # Solves the system L1 = L1p - L2p 
         # Iteration 2 : third order solution of the system
         phi[:, n + 1] = L1() \ ( rightHandSide(phi, n) - L2(phi_p2, n + 1, 1/3, 1/3) ) # Solves the system L1 = L1p - L2p
     end
+
     # Outlfow boundary condition 
     phi[2, n + 1] = 3 * phi[3, n + 1] - 3 * phi[4, n + 1] + phi[5, n + 1]
     phi[1, n + 1] = 3 * phi[2, n + 1] - 3 * phi[3, n + 1] + phi[4, n + 1]

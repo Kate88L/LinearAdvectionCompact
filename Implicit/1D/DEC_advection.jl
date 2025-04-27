@@ -22,9 +22,6 @@ k = 2
 # Courant number
 C = 1.5;
 
-ωk = 1/3;
-αk = 1/3;
-
 # Grid settings
 xL = - 1 * π / 2 * 0
 xR = 3 * π / 2 * 0 + 1.5
@@ -62,6 +59,9 @@ c = zeros(Nx+3) .+ u.(x) * tau / h
 # Set c plus and c minus
 cp = max.(c, 0)
 cm = min.(c, 0)
+
+ω = zeros(Nx + 3, Ntau + 3) .+ 1
+α = zeros(Nx + 3, Ntau + 3) .+ 1
 
 phi = zeros(Nx + 3, Ntau + 3);
 phi_p = zeros(Nx + 3, Ntau + 3);
@@ -121,7 +121,31 @@ function L1()
     return A
 end
 
-function L2(f, n, α = αk, ω = ωk)
+function ENO(f, n)
+    α = zeros(Nx + 3) .+ 1
+    ω = zeros(Nx + 3) .+ 1
+
+    # Simplified notation for easier reading
+    i = 3:Nx + 1
+    ip = 4:Nx + 2
+    ipp = 5:Nx + 3
+    im = 2:Nx
+    imm = 1:Nx - 1
+
+    # ENO reconstruction
+    ru_i = f[i, n] - 2 * f[ip, n] + f[ipp, n]
+    rd_i = f[ip, n] - 2 * f[i, n] + f[im, n]
+
+    ru_n = f[i, n] - 2 * f[i, n - 1] + f[i, n - 2]
+    rd_n = f[i, n - 1] - 2 * f[i, n] + f[i, n + 1]
+
+    ω[3:Nx + 1] .= ifelse.(abs.(ru_i) .< abs.(rd_i), 1, 0)
+    α[3:Nx + 1] .= ifelse.(abs.(ru_n) .< abs.(rd_n), 1, 0)
+
+    return ω, α
+end
+
+function L2(f, n, ω0 = ωk, α0 = αk)
     b = zeros(Nx + 3)
 
     # Simplified notation for easier reading
@@ -131,21 +155,25 @@ function L2(f, n, α = αk, ω = ωk)
     im = 2:Nx
     imm = 1:Nx - 1
 
+    global ω[:, n] .= ω0
+    global α[:, n] .= α0
+
     if n > Ntau + 1
         b[i] = b[i] + 0.5 * ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] )
     elseif n < 3
         b[i] = b[i] + 0.5 * ( f[i, n + 1] - f[i, n] - f[i, n] + phi_exact.(x[i], t[n - 1]) )
     else
-        b[i] = b[i] + 0.5 * ( α .* ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] ) +
-                            ( 1 - α ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + f[i, n - 1] ) )
+        b[i] = b[i] + 0.5 * ( α[i, n] .* ( f[i, n] - f[i, n - 1] - f[i, n - 1] + f[i, n - 2] ) +
+                            ( 1 .- α[i, n] ) .* ( f[i, n + 1] - f[i, n] - f[i, n] + f[i, n - 1] ) )
     end
 
-    b[i] = b[i] + (  0.5 * ( + cp[i] .* ( ω .* ( f[i, n] - 2 * f[im, n] + f[imm, n] ) +
-                                        ( 1 - ω ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) )
-                              - cm[i] .* ( ω .* ( f[i, n] - 2 * f[ip, n] + f[ipp, n] )  +
-                                        ( 1 - ω ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) ) ) )             
+    b[i] = b[i] + (  0.5 * ( + cp[i] .* ( ω[i, n] .* ( f[i, n] - 2 * f[im, n] + f[imm, n] ) +
+                                        ( 1 .- ω[i, n] ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) )
+                              - cm[i] .* ( ω[i, n] .* ( f[i, n] - 2 * f[ip, n] + f[ipp, n] )  +
+                                        ( 1 .- ω[i, n] ) .* ( f[ip, n] - 2 * f[i, n] + f[im, n] ) ) ) )             
     return b
 end
+
 
 @time begin
 

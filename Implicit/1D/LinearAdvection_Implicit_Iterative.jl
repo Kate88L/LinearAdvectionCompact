@@ -15,7 +15,7 @@ include("../../Utils/Utils.jl")
 third_order = true;
 
 # Level of refinement
-level = 3;
+level = 0;
 
 K = 1; # Number of iterations for the second order correction
 
@@ -52,7 +52,7 @@ x = range(xL-h, xR+h, length = Nx + 3)
 
 # Time
 # T = 1 * π / sqrt(7) * 2 / 10
-T = 8 * π / sqrt(7) * 1
+T = 8 * π / sqrt(7) * 0.5
 # tau = C * h / u
 Ntau = 1 * 2^level
 # Ntau = Int(round(Nx / 15 / C + 1))
@@ -123,10 +123,10 @@ end
 # Time Loop
 for n = 2:Ntau + 1
 
-    # phi1[3, n] = ( phi[3, n - 1] + c[3] * phi[2, n] ) / ( 1 + c[3] );
+    phi1[3, n] = ( phi[3, n - 1] + c[3] * phi[2, n] ) / ( 1 + c[3] );
 
-    # global phi_i_predictor = ( phi[3, n] - 1/2 * ( -phi1[3, n] + phi[3 , n - 1] ) + c[3] * ( phi2[2, n + 1] - 1/2 * ( -phi1[2, n + 1] + phi[1, n + 1] ) ) ) / ( 1 + c[3] );
-    global phi_i_predictor = phi2[3, n + 1];
+    global phi_i_predictor = ( phi[3, n] - 1/2 * ( -phi1[3, n] + phi[3 , n - 1] ) + c[3] * ( phi2[2, n + 1] - 1/2 * ( -phi1[2, n + 1] + phi[1, n + 1] ) ) ) / ( 1 + c[3] );
+    # global phi_i_predictor = phi2[3, n + 1];
 
     for i = 3:1:Nx + 2
 

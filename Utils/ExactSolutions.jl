@@ -37,17 +37,22 @@ function nonSmoothRotation(x, y, t, orientation = "counterclockwise")
     end
 
 
+    # Build outward-growing pyramid shape
     if y_hat >= abs.(x_hat)
-        result = y_hat
-    elseif - y_hat >= abs.(x_hat)
-        result = - y_hat
+        r = y_hat
+    elseif -y_hat >= abs.(x_hat)
+        r = -y_hat
     elseif x_hat >= abs.(y_hat)
-        result = x_hat
+        r = x_hat
     else
-        result = - x_hat
+        r = -x_hat
     end
 
-    return min.(result, 0.15)
+    # Invert: max at center, decay to 0
+    hmax = 0.15
+    result = max.(hmax .- r, 0.0)
+
+    return result
 end
 
 function rotatedGaussian(x, y, t, orientation = "counterclockwise")

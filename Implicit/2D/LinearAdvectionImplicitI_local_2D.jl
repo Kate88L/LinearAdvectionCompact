@@ -4,6 +4,7 @@ using LinearAlgebra
 using PlotlyJS
 using CSV 
 using DataFrames
+using ProgressMeter
 using JSON
 using DataStructures
 
@@ -13,15 +14,15 @@ include("../../Utils/Utils.jl")
 
 ## Definition of basic parameters
 
-third_order = true;
+third_order = false;
 
 # Level of refinement
-level = 1;
+level = 3;
 
-K = 1 # Number of iterations for the second order correction
+K = 3 # Number of iterations for the second order correction
 
 # Courant number
-C = 2;
+C = 5;
 
 # Grid settings
 xL = -3
@@ -36,8 +37,8 @@ u(x, y) = -1.5
 v(x, y) = 1.5
 
 # Initial condition
-phi_0(x, y) = x.^3 + y.^3
-# phi_0(x, y) = piecewiseLinear2D(x, y);
+# phi_0(x, y) = x.^3 + y.^3
+phi_0(x, y) = piecewiseLinear2D(x-1, y+1);
 # phi_0(x, y) = exp.(-10 * (x.^2 + y.^2));
 # phi_0(x,y) = 0.8*exp.(-(x.^2 + y.^2)/1.7);
 
@@ -54,7 +55,7 @@ X = repeat(x, 1, length(y))
 Y = repeat(y, 1, length(x))'
 
 # Time
-Tfinal = 1 * π / sqrt(7) * 1 / 5
+Tfinal = 1 * π / sqrt(7) * 0.5
 Ntau = 1 * 2^level
 tau = C * h / maximum(max(abs.(u.(x, y)), abs.(v.(x, y))))
 Ntau = Int(round(Tfinal / tau))
@@ -159,6 +160,8 @@ for n = 2:Ntau + 3
     phi[:, N + 3, n] = phi_exact.(x, y[N + 3], t[n]);
     phi_first_order[:, N + 3, n] = phi_exact.(x, y[N + 3], t[n]);
 end
+
+PB = Progress(Ntau * N^2);
 
 ## MAIN LOOP ====================================================================================================
 
@@ -387,6 +390,7 @@ for n = 2:Ntau + 1
                     phi2[i, j, n + 1] = phi[i, j, n + 1];
 
                 end
+                next!(PB)
             #     phi[N + 3, j, n + 1] = 3 * phi[N + 2, j, n + 1] - 3 * phi[N + 1, j, n + 1] + phi[N, j, n + 1];
             #     phi2[N + 3, j, n + 1] = 3 * phi2[N + 2, j, n + 1] - 3 * phi2[N + 1, j, n + 1] + phi2[N, j, n + 1];
             #     phi1[N + 3, j, n + 1] = 3 * phi1[N + 2, j, n + 1] - 3 * phi1[N + 1, j, n + 1] + phi1[N, j, n + 1];
@@ -442,14 +446,14 @@ println("maximum derivative y: ", maximum(d_phi_y))
 
 # Plot of the result at the final time together with the exact solution
 trace3 = contour(x = x, y = y, z = phi_exact.(X, Y, t[end - 1])', mode = "lines", name = "Exact", showscale=false, contours_coloring="lines", colorscale="Greys", line_width=2)
-trace0 = contour(x = x, y = y, z = phi_0.(X, Y)', mode = "lines", name = "Initial Condition", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1 )
-trace2 = contour(x = x, y = y, z = phi[:, :, end - 1]', mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
+trace0 = contour(x = x, y = y, z = phi_0.(X, Y)', mode = "lines", name = "Initial Condition", showscale=false, colorscale = "Greys", contours_coloring="lines", line_dash="dash",line_width=1 )
+trace2 = contour(x = x, y = y, z = phi[:, :, end - 1]', name = "lPC", showscale=true, colorscale = "Plasma", contours_coloring="heatmap", line_width=0.5)
 trace1 = contour(x = x, y = y, z = phi_first_order[:, :, end - 1]', mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_dash="dash", line_width=1)
 
-layout = Layout(plot_bgcolor="white", 
-                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
+layout = Layout(width=500, height=500, plot_bgcolor="white", 
+                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20),scaleanchor = "y"), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 # plot_phi = plot([ trace2, trace1,trace5, trace4, trace3], layout)
-plot_phi = plot([ trace3, trace2, trace1 ], layout)
+plot_phi = plot([ trace2, trace0 ], layout)
 
 plot_phi
 
@@ -457,9 +461,12 @@ plot_phi
 # d_phi_x = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_x)
 # d_phi_y = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_y)
 
+d_phi_x = map(x -> abs(x) < 1e-4 ? 0 : x, d_phi_x)
+d_phi_y = map(x -> abs(x) < 1e-4 ? 0 : x, d_phi_y)
+
 # Plot derivative
-trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
-trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="heatmap", line_width=0.5, ncontours = 20)
+trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="heatmap", line_width=0.5, ncontours = 20)
 
 plot_phi_d_x = plot([trace1_d_x])
 plot_phi_d_y = plot([trace1_d_y])

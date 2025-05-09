@@ -1,6 +1,8 @@
 #  iterative 2nd order fully implicit scheme for linear advection equation
 
 using LinearAlgebra
+using DataStructures
+using ProgressMeter
 using PlotlyJS
 using CSV
 using DataFrames
@@ -14,12 +16,12 @@ include("../../Utils/Utils.jl")
 third_order = false;
 
 # Level of refinement
-level = 4;
+level = 3;
 
 K = 1 # Number of iterations for the second order correction
 
 # Courant number
-C = 3.0;
+C = 5.0;
 
 # Grid settings
 xL = 0.0 #- 2 * π / 2
@@ -49,12 +51,12 @@ phi_0(x, y) = rotatedGaussian(x, y, 0)
 phi_exact(x, y, t) = rotatedGaussian(x, y, t)    
 
 # Time
-Tfinal = 0.1
+Tfinal = pi/3.5
 Ntau = 1 * 2^level
 tau = C * h / maximum(max(abs.(u.(x, y)), abs.(v.(x, y))))
 Ntau = Int(round(Tfinal / tau))
 
-# Ntau = 1
+# Ntau = 0
 
 t = range(0, (Ntau + 2) * tau, length = Ntau + 3)
 
@@ -154,6 +156,8 @@ sweep_cases_mask = Dict(
     3 => (N+3:-1:1, 1:1:N+3),
     4 => (N+3:-1:1, N+3:-1:1)
 )
+
+PB = Progress(Ntau * N^2);
 
 @time begin
 
@@ -380,7 +384,11 @@ for n = 2:Ntau + 1
                     phi2_i_old_p = phi2[i, j, n + 1];
                     phi2[i, j, n + 1] = phi[i, j, n + 1];
 
+                    
+
                 end
+
+                next!(PB)
             end
             # phi[:, N + 2, n + 1] = 3 * phi[:, N + 1, n + 1] - 3 * phi[:, N, n + 1] + phi[:, N - 1, n + 1];
             # phi2[:, N + 2, n + 1] = 3 * phi2[:, N + 1, n + 1] - 3 * phi2[:, N, n + 1] + phi2[:, N - 1, n + 1];
@@ -442,14 +450,14 @@ println("maximum derivative y: ", maximum(d_phi_y))
 
 # Plot of the result at the final time together with the exact solution
 trace3 = contour(x = x, y = y, z = phi_exact.(X, Y, t[end - 1])', mode = "lines", name = "Exact", showscale=false, contours_coloring="lines", colorscale="Greys", line_width=2)
-trace0 = contour(x = x, y = y, z = phi_0.(X, Y)', mode = "lines", name = "Initial Condition", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1 )
-trace2 = contour(x = x, y = y, z = phi[:, :, end - 1]', mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=1)
+trace0 = contour(x = x, y = y, z = phi_0.(X, Y)', mode = "lines", name = "Initial Condition", showscale=false, colorscale = "Greys", contours_coloring="lines", line_dash="dash",line_width=1 )
+trace2 = contour(x = x, y = y, z = phi[:, :, end - 1]', name = "lPC", showscale=true, colorscale = "Plasma", contours_coloring="heatmap", line_width=0.5)
 trace1 = contour(x = x, y = y, z = phi_first_order[:, :, end - 1]', mode = "lines", name = "First order", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_dash="dash", line_width=1)
 
-layout = Layout(plot_bgcolor="white", 
-                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20)), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
+layout = Layout(width=500, height=500, plot_bgcolor="white", 
+                xaxis=attr(zerolinecolor="gray", gridcolor="lightgray", tickfont=attr(size=20),scaleanchor = "y"), yaxis=attr(zerolinecolor="gray", gridcolor="lightgray",tickfont=attr(size=20)))
 # plot_phi = plot([ trace2, trace1,trace5, trace4, trace3], layout)
-plot_phi = plot([ trace3, trace1, trace2 ], layout)
+plot_phi = plot([ trace2, trace0 ], layout)
 
 plot_phi
 
@@ -458,12 +466,12 @@ plot_phi
 # d_phi_y = map(x -> abs(x) < 0.99 ? 0 : x, d_phi_y)
 
 # Plot derivative
-trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
-trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+# trace1_d_x = contour(x = x, y = y, z = d_phi_x[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
+# trace1_d_y = contour(x = x, y = y, z = d_phi_y[:, :]', name = "Implicit", showscale=false, colorscale = "Plasma", contours_coloring="lines", line_width=2, ncontours = 100)
 
-plot_phi_d_x = plot([trace1_d_x])
-plot_phi_d_y = plot([trace1_d_y])
+# plot_phi_d_x = plot([trace1_d_x])
+# plot_phi_d_y = plot([trace1_d_y])
 
-p = [plot_phi; plot_phi_d_x plot_phi_d_y]
-relayout!(p, width=800, height=1000)
-p
+# p = [plot_phi; plot_phi_d_x plot_phi_d_y]
+# relayout!(p, width=800, height=1000)
+# p
